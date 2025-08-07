@@ -190,5 +190,9 @@ int main() {
     JS_FreeValue(ctx, global_obj);
     JS_FreeContext(ctx);
     JS_FreeRuntime(rt);
+
+
+    printf("JS_NAN = %x\n", JS_NAN);
+    printf("JS_FLOAT64_TAG_ADDEND = %x\n", (0x7ff80000 + 9 + 1));
     return 0;
 }

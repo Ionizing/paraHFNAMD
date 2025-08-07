@@ -21,26 +21,30 @@ SRC =        fn.cpp \
             sym.cpp \
             paw.cpp \
       wave_base.cpp \
-	   wave.cpp \
-	    soc.cpp \
+           wave.cpp \
+            soc.cpp \
              io.cpp \
-	    nac.cpp \
-	   wpot.cpp \
-	    bse.cpp \
-	optical.cpp \
+            nac.cpp \
+           wpot.cpp \
+            bse.cpp \
+        optical.cpp \
        dynamics.cpp \
-	  tdcft.cpp \
-	    dsh.cpp \
+          tdcft.cpp \
+            dsh.cpp \
+         efield.cpp \
         hopping.cpp \
            main.cpp
 
 OBJ = $(SRC:%.cpp=%.o)
 
-$(EXE): $(OBJ) libfftw3x_cdft_lp64.a
+$(EXE): $(OBJ) libfftw3x_cdft_lp64.a libqjs.a
 	$(CC) $(CFLAGS) $(INTELFLAGS) $(LIB) $^ -o $@ && cp -f $(EXE) ..
 
 libfftw3x_cdft_lp64.a: fftw3x_cdft
 	cd $< && $(MAKE) libintel64 MKLROOT=$(MKLROOT) INSTALL_DIR=".." && cd ..
+
+libqjs.a:
+	cd quickjs && $(MAKE) $@ && cp $@ .. && cd ..
 
 fftw3x_cdft:
 	cp -r $(MKLROOT)/interfaces/$@ .
@@ -56,3 +60,4 @@ clean:
 
 veryclean:
 	rm -rf *.o */*.o ../$(EXE) $(EXE) *.a fftw3x_cdft obj_intel64_lp64 to_w3j_h w3j.h
+	cd quickjs && $(MAKE) clean && cd ..

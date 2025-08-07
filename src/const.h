@@ -187,4 +187,6 @@ extern int            lrecomb;   // recombination option: 0-not recombine, 1-non
 extern int            bsedone;   // = 1 if bse was calculated before and
                                  // make sure tmpDirect/ and tmpExchange/ exist in calculation directory
 
+extern bool   has_efield;       // Does it have external optical field
+extern string efield_fname;     // Filename of external optical field, usually "efield.js"
 #endif
