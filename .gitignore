@@ -1,0 +1,7 @@
+*.o
+*.a
+src/fftw3x_cdft
+src/w3j.h
+
+HFNAMD
+to_w3j_h
