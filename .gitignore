@@ -1,5 +1,6 @@
 *.o
 *.a
+*.x
 src/fftw3x_cdft
 src/w3j.h
 
