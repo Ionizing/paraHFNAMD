@@ -61,6 +61,10 @@ void ReadInput(const char *input) {
     lrecomb = 0;
     // auxiliary
     bsedone = 0;
+
+    // External optical field
+    has_efield = false;
+    efield_fname = std::string();
     
     string        inputstr = WholeFile2String(inf);
     inf.close();
@@ -137,6 +141,10 @@ void ReadInput(const char *input) {
 
         // auxiliary
         else if(vecstrtmp[0] == "bsedone") bsedone = stoi(vecstrtmp[2]);
+
+        // External optical field
+        else if(vecstrtmp[0] == "has_efield") has_efield = stoi(vecstrtmp[2]);
+        else if(vecstrtmp[0] == "efield_fname") efield_fname = vecstrtmp[2];
     }
 
     // task mode
@@ -337,6 +345,13 @@ void ReadInput(const char *input) {
     neleint += neleint % 2; // guarantee even integral intervals
     if(intalgo != "Magnus" && intalgo != "Euler") intalgo = "Magnus"; // set to default
     ntrajec = (ntrajec / bckntrajs + 1) * bckntrajs; // only valid for dish/dcsh
+
+    // External optical field
+    if (has_efield) {
+        if (efield_fname.empty()) {
+            CERR << "You enabled 'has_efield', which requires 'efield_fname' to be a valid file, please check." << endl; EXIT(1);
+        }
+    }
 
     return;
 }

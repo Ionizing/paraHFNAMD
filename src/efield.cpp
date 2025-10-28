@@ -102,7 +102,10 @@ static int js_init_efield_data_class(JSContext *ctx, JSValue global_obj) {
 // Read JS code from file
 static char* read_file(const char* filename) {
     FILE* f = fopen(filename, "rb");
-    if (!f) return NULL;
+    if (!f) {
+        fprintf(stderr, "Optical field file '%s' not valid.\n", filename);
+        return NULL;
+    }
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     rewind(f);
@@ -214,5 +217,6 @@ std::vector<EField> get_efield_array(const std::vector<double>& ts) {
 
 
 void set_efield_array(const std::vector<double>& ts) {
+    // efield.h:  extern efields
     efields = get_efield_array(ts);
 }

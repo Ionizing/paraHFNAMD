@@ -13,6 +13,7 @@
 #include "io.h"
 #include "dynamics.h"
 #include "tdcft.h"
+#include "efield.h"
 
 using namespace std;
 
@@ -143,6 +144,11 @@ int            lrecomb;   // recombination option: 0-not recombine, 1-nonradiati
 // auxiliary
 int            bsedone;   // = 1 if bse was calculated before and
                           // make sure tmpDirect/ and tmpExchange/ exist in calculation directory
+
+bool           has_efield;    // If external optical field imposed
+string         efield_fname;  // Optical field file name
+vector<EField> efields;       // Optical field data, in nions*nele x 3
+
 
 int main(int argc, char *argv[]) {
     int required = /*MPI_THREAD_SERIALIZED;*/ MPI_THREAD_MULTIPLE;
