@@ -29,9 +29,9 @@ class excitonclass {
     double omega0; int ncells;  // available when use GW, inherit from wpc
     int kappa;                  // kappa = 2/0 for singlet/triplet state
     int NK_SC[3];               // sanme kpoints in wvc & wpc NK_SC
-    int NKSCtot;                // NK_SC[0 x 1 x 2]
+    int NKSCtot;                // NK_SC[0 x 1 x 2], NKSCtot = NK_SC[0] * NK_SC[1] * NK_SC[2] 
     int NKSCtot2;               // NKSCtot x NKSCtot
-    int dimC, dimV, dim, nsdim; // dim = NKSCtot x dimC x dimV, nsdim = bsespns x dim
+    int dimC, dimV, dim, nsdim; // dim = NKSCtot x dimC x dimV, nsdim = bsespns x dim, number of total excitons
     int dim_loc_row;            // local of dim by row
     int dim_loc_col;            // local of dim by column
     int nsdim_loc_row;          // local of nsdim by row
@@ -97,9 +97,15 @@ class excitonclass {
     complex<double> *kkccDenMat = NULL;    // [npw x dimKKCC]
     complex<double> *kkvvDenMat = NULL;    // [npw x dimKKCC]
     
-    // method
+    // methods
+
+    /// Calculate total NGRID, ngtot = ng[0] * ng[1] * ng[2]
     void GetngBSE();
+
+    /// Check if given G vector is in the EMAX sphere centered at `qpoint`
     bool WithinSphereBSE(int i, int j, int k, double *qpoint);
+
+    ///
     void GetgidxBSE(); bool isGetgidxBSE = false;
     void Getqgabsdir(); bool isGetqgabsdir = false;
     void GetfftIntPre(const int sign); bool isGetfftIntPre = false;

@@ -236,9 +236,9 @@ void excitonclass::DenMatColumnPseudoPart(const int s1, const int k1, const int 
 
 void excitonclass::DenMatCPLeftMatBlockCyclic(const int iqpt, complex<double> *leftmat) {
 /*
-    Left: (<phi^a_i | e^{i(q+G).r} | phi^a_j> - <~phi^a_i | e^{i(q+G).r} | ~phi^a_j>)
-          = e^{i(q+G).R_a} x Ekrij            with dimension [npw(q) x totnvij[-1]]
-*/
+ *  Left: (<phi^a_i | e^{i(q+G).r} | phi^a_j> - <~phi^a_i | e^{i(q+G).r} | ~phi^a_j>)
+ *        = e^{i(q+G).R_a} x Ekrij            with dimension [npw(q) x totnvij[-1]]
+ */
     const int totnvij_loc_col = Numroc(totnvij[wvc->numatoms], NB_COL, mypcol_group, npcol_group);
     for(int jcol = 0; jcol < totnvij_loc_col; jcol++) {
         int jcol_glb = BlacsIdxloc2glb(jcol, totnvij[wvc->numatoms], NB_COL, mypcol_group, npcol_group);
