@@ -13,10 +13,13 @@ typedef struct {
 
 extern std::vector<EField> efields;
 
-void init_engine(const std::string& fname);
-EField get_efield(const double t);
-std::vector<EField> get_efield_array(const std::vector<double>& ts);
-void set_efield_array(const std::vector<double>& ts);
-void destroy_engine();
+// No need to export these symbols
+//void init_engine(const std::string& fname);
+//EField get_efield(const double t);
+//std::vector<EField> get_efield_array(const std::vector<double>& ts);
+//void set_efield_array(const std::vector<double>& ts);
+//void destroy_engine();
+
+void init_efield(const std::string& jsfname, int namdtim, int neleint);
 
 #endif // EFIELD_H

@@ -296,6 +296,11 @@ int main(int argc, char *argv[]) {
         MPI_Barrier(world_comm);
     } while(1);*/
 
+    // Initialize efield stuff if necessary
+    if (has_efield) {
+        init_efield(efield_fname, namdtim, neleint);
+    }
+
     // task
     CreatWorkDir(world_rk, world_sz, world_comm);
     double tstart, tend; tstart = omp_get_wtime();

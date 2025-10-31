@@ -1,8 +1,18 @@
+/*
+ * Utilities on how to get external EField.
+ *
+ * Use quickjs to eval get_efield_array with given ts time array.
+ *
+ * Author: Ionizing
+ */
+
+
 #include <fstream>
 #include <string>
 #include "quickjs/quickjs.h"
 #include "quickjs/quickjs-libc.h"
 #include "efield.h"
+#include "mpi.h"
 
 static JSRuntime* RT = nullptr;
 static JSContext* CTX = nullptr;
@@ -117,7 +127,7 @@ static char* read_file(const char* filename) {
 }
 
 
-void init_engine(const std::string& fname) {
+static void init_engine(const std::string& fname) {
     if (!RT) { RT = JS_NewRuntime(); }
     if (!CTX) { CTX = JS_NewContext(RT); }
     if (JS_IsNull(GLOBAL_OBJ)) { GLOBAL_OBJ = JS_GetGlobalObject(CTX); }
@@ -144,7 +154,7 @@ void init_engine(const std::string& fname) {
     }
 }
 
-void destroy_engine() {
+static void destroy_engine() {
     if (!JS_IsNull(FN)) { JS_FreeValue(CTX, FN); }
     if (!JS_IsNull(GLOBAL_OBJ)) { JS_FreeValue(CTX, GLOBAL_OBJ); }
     if (!CTX) { JS_FreeContext(CTX); }
@@ -152,7 +162,7 @@ void destroy_engine() {
 }
 
 
-EField get_efield(const double t) {
+static EField get_efield(const double t) {
     EField ret{0.0, 0.0, 0.0};
 
     JSValue arg[1];
@@ -182,7 +192,7 @@ EField get_efield(const double t) {
 }
 
 
-std::vector<EField> get_efield_array(const std::vector<double>& ts) {
+static std::vector<EField> get_efield_array(const std::vector<double>& ts) {
     size_t len = ts.size();
     std::vector<EField> ret;
     ret.reserve(len);
@@ -216,7 +226,32 @@ std::vector<EField> get_efield_array(const std::vector<double>& ts) {
 }
 
 
-void set_efield_array(const std::vector<double>& ts) {
+static void set_efield_array(const std::vector<double>& ts) {
     // efield.h:  extern efields
     efields = get_efield_array(ts);
+}
+
+void init_efield(const std::string& jsfname, int namdtim, int neleint) {
+    int veclength = namdtim * neleint;
+
+    if (is_world_root) {
+        std::vector<double> ts = std::vector<double>(veclength, 0.0);
+        int cnt = 0;
+        double timestep = double(iontime) / double(neleint);    // Time step for each electron time
+        for (int inamdtim=0; inamdtim<namdtim; ++inamdtim) {
+            for (int iele; iele<neleint; ++iele) {
+                ts[cnt] = inamdtim * iontime + iele * timestep;
+                ++cnt;
+                
+            }
+        }
+
+        init_engine(jsfname);
+        set_efield_array(ts);
+        destroy_engine();
+    } else {
+        efields = std::vector<EField>(veclength, {0.0, 0.0, 0.0});
+    }
+
+    MPI_Bcast(efields.data(), veclength * 3, MPI_DOUBLE, world_root, world_comm);
 }

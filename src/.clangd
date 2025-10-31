@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-I/public/apps/intel/oneapi/mkl/2021.2.0/include/fftw]

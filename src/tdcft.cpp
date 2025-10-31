@@ -1,4 +1,5 @@
 #include "tdcft.h"
+#include "efield.h"
 
 void InterpolationForTDMat(const int ntimes, const double time_interval,
                            const char *mat_dir_name,
@@ -348,7 +349,9 @@ void BuildAllTDMatSplineCoeff() {
     else if(carrier == "exciton") {
         if(is_world_root) {
             // energy difference                                                 should be "dim" here
-            InterpolationForTDMat(totstru, iontime, (namddir + "/tmpDiagonal/").c_str(), 0, dim, false, false);
+            InterpolationForTDMat(totstru, iontime, (namddir + "/tmpDiagonal/").c_str(), 0, dim,         false, false);
+            // TDM                                                                          3 complex<double> for each entry
+            InterpolationForTDMat(totstru, iontime, (namddir + "/tmpTDM/").c_str(),      0, dim * 2 * 3, false, false);
         }
         MPI_Barrier(world_comm);
         CombineAllSplineCoeff(totstru - 1, dimC, dimC, (namddir + "/tmpCBNAC/").c_str(), nspns * nkpts, true);
@@ -608,6 +611,44 @@ void ReadCtoVNAC(const char *filename, const int itime,
     return;
 }
 
+
+void ReadCtoVTDM(const char *filename, const int itime,
+                 const int nspns, const int nkpts, const int dimC, const int dimV,
+                 const complex<double> alpha, complex<double> *locmat) {
+    ifstream inf(filename, ios::in|ios::binary);
+    if(!inf.is_open()) { cerr << "ERROR: " << filename << " can't open in tdcft.cpp::ReadCtoVTDM" << endl; exit(1); }
+    const int dimCV = dimC * dimV;
+    const int start_idx = 1; // MUST "1"
+    const int dim = nspns * nkpts * dimCV + start_idx;
+    const int dim_loc = Numroc(dim, MB_ROW, myprow_group, nprow_group);
+    int iprow, jpcol, ii_loc_row, jj_loc_col;
+    int ic, iv;
+    complex<double> cdtmp;
+    for(int is = 0; is < nspns; is++)
+    for(int ik = 0; ik < nkpts; ik++) {
+        for(int icv = 0; icv < dimCV; icv++) {
+            BlacsIdxglb2loc((is * nkpts + ik) * dimCV + icv + start_idx, iprow, ii_loc_row, 0, dim, MB_ROW, nprow_group);
+            BlacsIdxglb2loc((is * nkpts + ik) * dimCV + icv + start_idx, jpcol, jj_loc_col, 0, dim, NB_COL, npcol_group);
+            if(myprow_group != 0 && mypcol_group != 0) continue;
+            ic = icv / dimV; iv = icv % dimV;
+            inf.seekg(sizeof(complex<double>) * ( (size_t)itime * totdiffspns * nkpts * dimCV
+                                                + (size_t)(min(is, totdiffspns - 1) * nkpts + ik) * dimCV 
+                                                + (ic + iv * dimC) ), ios::beg);
+            inf.read((char*)&cdtmp, sizeof(complex<double>));
+            if(myprow_group == iprow && mypcol_group == 0) { // first column must in first process column
+                locmat[ii_loc_row] += alpha * cdtmp;
+            }
+            if(mypcol_group == jpcol && myprow_group == 0) { // first row must in first process row
+                locmat[jj_loc_col * dim_loc] += alpha * ( - conj(cdtmp) );
+            }
+        }
+    }
+    inf.close();
+    MPI_Barrier(group_comm);
+    return;
+}
+
+
 void ReadOnsiteC(const int t_ion, const int matsize,
                  const int nspns, const int nkpts, const int dimC, const int dimV,
                  vector<int> &allispns, vector<int> &allikpts, const int *ibndstart,
@@ -634,7 +675,7 @@ void ReadOnsiteC(const int t_ion, const int matsize,
             ReadDiag((namddir + "/tmpEnergy/c0123").c_str(), 4 * (t_stru - 1) + i,
                      allispns, allikpts, ibndstart, nbnds, totnspns, totnkpts, totnbnds, 
                      (carrier == "electron" ? 1.0 : -1.0) / (iu_d * hbar), c_onsite[i]);
-            if(hopmech == "nacsoc"); // need read extra soc matrix
+            if(hopmech == "nacsoc") {} // need read extra soc matrix
         }
     }
     else if(carrier == "exciton") {
@@ -645,16 +686,18 @@ void ReadOnsiteC(const int t_ion, const int matsize,
         for(int i = 0; i < 4; i++) {
             Blacs_ReadDiag2Full((namddir + "/tmpDiagonal/c0123").c_str(), 4 * (t_stru - 1) + i,
                                 matsize, 1.0 / (iu_d * hbar), c_onsite[i], start_idx);
+
             if(is_bse_calc) {
-                if(abs(dynchan[0]) > 1e-8) // direct term
-                Blacs_ReadFullMat((namddir + "/tmpDirect/c0123").c_str(), 4 * (t_stru - 1) + i,
+                if(abs(dynchan[0]) > 1e-8) { // direct term
+                    Blacs_ReadFullMat((namddir + "/tmpDirect/c0123").c_str(), 4 * (t_stru - 1) + i,
                                   matsize, dynchan[0] / (iu_d * hbar), /*locbeg, glbbeg, bcklen,*/ c_onsite[i], start_idx);
-                if(abs(dynchan[1]) > 1e-8) // exchange term
-                Blacs_ReadFullMat((namddir + "/tmpExchange/c0123").c_str(), 4 * (t_stru - 1) + i,
-                                  matsize, dynchan[1] / (iu_d * hbar), /*locbeg, glbbeg, bcklen,*/ c_onsite[i], start_idx);
+                }
+                if(abs(dynchan[1]) > 1e-8) { // exchange term
+                    Blacs_ReadFullMat((namddir + "/tmpExchange/c0123").c_str(), 4 * (t_stru - 1) + i,
+                            matsize, dynchan[1] / (iu_d * hbar), /*locbeg, glbbeg, bcklen,*/ c_onsite[i], start_idx);
+                }
             }
-            if((lrecomb == 2 || lrecomb == 3) && abs(dynchan[3]) > 1e-8) // radiative recombination
-            ;
+            if((lrecomb == 2 || lrecomb == 3) && abs(dynchan[3]) > 1e-8) {} // radiative recombination
         }
     }
     return;
@@ -695,14 +738,15 @@ void ReadMidsiteC(const int t_ion, const int matsize,
         // NAC is midsite, else onesite
         const int start_idx = ( lrecomb ? 1 : 0 ); 
         for(int i = 0; i < 4; i++) {
-            if(abs(dynchan[2]) > 1e-8) // e-ph
-            ReadNACbySK((namddir + "/tmpCBNAC/c0123").c_str(),
-                        (namddir + "/tmpVBNAC/c0123").c_str(), 4 * t_stru + i,
-                        start_idx, nspns, nkpts, dimC, dimV, - 1.0 * oddeven_scale * dynchan[2], c_midsite[i]);
-            if((lrecomb == 1 || lrecomb == 3) && abs(dynchan[2]) > 1e-8) // nonradiative recombination
-            ReadCtoVNAC((namddir + "/tmpC2VNAC/c0123").c_str(), 4 * t_stru + i,
-                        nspns, nkpts, dimC, dimV, - 1.0 * oddeven_scale * dynchan[2], c_midsite[i]);
-            ;
+            if(abs(dynchan[2]) > 1e-8) { // e-ph
+                ReadNACbySK((namddir + "/tmpCBNAC/c0123").c_str(),
+                            (namddir + "/tmpVBNAC/c0123").c_str(), 4 * t_stru + i,
+                            start_idx, nspns, nkpts, dimC, dimV, - 1.0 * oddeven_scale * dynchan[2], c_midsite[i]);
+            }
+            if((lrecomb == 1 || lrecomb == 3) && abs(dynchan[2]) > 1e-8) { // nonradiative recombination
+                ReadCtoVNAC((namddir + "/tmpC2VNAC/c0123").c_str(), 4 * t_stru + i,
+                            nspns, nkpts, dimC, dimV, - 1.0 * oddeven_scale * dynchan[2], c_midsite[i]);
+            }
         }
     }
 
@@ -768,7 +812,9 @@ void A0Coeff(const int nstates, const double h, const complex<double> *a0,
 }
 
 void EomegaCoeff(const int nstates, const double h,
-                 complex<double> *om_oih, complex<double> *coeff, const int ntrajs) {
+                 const complex<double> *om_oih,
+                 complex<double> *coeff,
+                 const int ntrajs) {
 /*
     calculate coeff = e^(i x h x om_oih) x coeff 
     read om_oih and coeff update in this routine

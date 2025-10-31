@@ -1086,6 +1086,12 @@ void excitonclass::XEnergies(const complex<double> *bcmat) {
             if(ix < nsdim - 1) bseout << endl; // add an empty line
         }
         bseout.close(); bsevec.close();
+
+        ofstream tdmout((namddir + "/tmpTDM/" + Int2Str(dirnum)).c_str(), ios::out|ios::binary);
+        if(!tdmout.is_open())  { cerr << "ERROR: " << namddir + "/tmpTDM/" + Int2Str(dirnum) << " can't open" << endl; exit(1); }
+        tdmout.write((char*)Xtdm_full, sizeof(complex<double>) * nsdim * 3);
+        tdmout.close();
+
         delete[] root_eigenvecs; delete[] one_vec_abs2;
         delete[] Xtdm_full;
     } MPI_Barrier(group_comm);

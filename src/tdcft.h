@@ -71,7 +71,9 @@ void Mat_CtoA(complex<double> **c_onsite, complex<double> **c_midsite,
 void A0Coeff(const int nstates, const double h, const complex<double> *a0,
              complex<double> *coeff);
 void EomegaCoeff(const int nstates, const double h,
-                 complex<double> *om_oih, complex<double> *coeff, const int ntrajs = 1);
+                 const complex<double> *om_oih,
+                 complex<double> *coeff,
+                 const int ntrajs = 1);
 void CoeffUpdate(const double h, const int t_ion, const int nstates, 
                  const int nspns, const int nkpts, const int dimC, const int dimV,
                  vector<int> &allispns, vector<int> &allikpts, const int *ibndstart,
