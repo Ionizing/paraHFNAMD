@@ -28,7 +28,7 @@ class excitonclass {
     double omega;               // entire crystal volume
     double omega0; int ncells;  // available when use GW, inherit from wpc
     int kappa;                  // kappa = 2/0 for singlet/triplet state
-    int NK_SC[3];               // sanme kpoints in wvc & wpc NK_SC
+    int NK_SC[3];               // same kpoints in wvc & wpc NK_SC
     int NKSCtot;                // NK_SC[0 x 1 x 2], NKSCtot = NK_SC[0] * NK_SC[1] * NK_SC[2] 
     int NKSCtot2;               // NKSCtot x NKSCtot
     int dimC, dimV, dim, nsdim; // dim = NKSCtot x dimC x dimV, nsdim = bsespns x dim, number of total excitons

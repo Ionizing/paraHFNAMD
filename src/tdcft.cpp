@@ -612,37 +612,61 @@ void ReadCtoVNAC(const char *filename, const int itime,
 }
 
 
-void ReadCtoVTDM(const char *filename, const int itime,
-                 const int nspns, const int nkpts, const int dimC, const int dimV,
-                 const complex<double> alpha, complex<double> *locmat) {
-    ifstream inf(filename, ios::in|ios::binary);
-    if(!inf.is_open()) { cerr << "ERROR: " << filename << " can't open in tdcft.cpp::ReadCtoVTDM" << endl; exit(1); }
-    const int dimCV = dimC * dimV;
-    const int start_idx = 1; // MUST "1"
-    const int dim = nspns * nkpts * dimCV + start_idx;
-    const int dim_loc = Numroc(dim, MB_ROW, myprow_group, nprow_group);
-    int iprow, jpcol, ii_loc_row, jj_loc_col;
-    int ic, iv;
-    complex<double> cdtmp;
-    for(int is = 0; is < nspns; is++)
-    for(int ik = 0; ik < nkpts; ik++) {
-        for(int icv = 0; icv < dimCV; icv++) {
-            BlacsIdxglb2loc((is * nkpts + ik) * dimCV + icv + start_idx, iprow, ii_loc_row, 0, dim, MB_ROW, nprow_group);
-            BlacsIdxglb2loc((is * nkpts + ik) * dimCV + icv + start_idx, jpcol, jj_loc_col, 0, dim, NB_COL, npcol_group);
-            if(myprow_group != 0 && mypcol_group != 0) continue;
-            ic = icv / dimV; iv = icv % dimV;
-            inf.seekg(sizeof(complex<double>) * ( (size_t)itime * totdiffspns * nkpts * dimCV
-                                                + (size_t)(min(is, totdiffspns - 1) * nkpts + ik) * dimCV 
-                                                + (ic + iv * dimC) ), ios::beg);
-            inf.read((char*)&cdtmp, sizeof(complex<double>));
-            if(myprow_group == iprow && mypcol_group == 0) { // first column must in first process column
-                locmat[ii_loc_row] += alpha * cdtmp;
-            }
-            if(mypcol_group == jpcol && myprow_group == 0) { // first row must in first process row
-                locmat[jj_loc_col * dim_loc] += alpha * ( - conj(cdtmp) );
-            }
-        }
+/*!
+ * @brief Read exciton TDM splince coefficients at `itime` from tmpTDM/c0123
+ *
+ * @details
+ * Expected c0123 should be a complex<double> array of [xdim * 3 * 4 * totstru]
+ * where:
+ *  - xdim means number of excitons, this index is the fastest.
+ *  - 3 means x,y,z directions.
+ *  - 4 means four cubic spline coefficients, c0, c1, c2 and c3.
+ *  - totstru means how many ionic steps are there.
+ *
+ *  TDM(t_ion + dt) = c0(t_ion) +
+ *                    c1(t_ion) * dt +
+ *                    c2(t_ion) * dt^2 +
+ *                    c3(t_ion) * dt^3 .
+ *
+ * @params[in]:
+ *      - `const char* filename`: file name of c0123 file.
+ *      - `const int t_ion`: time of ionic step, \in [1, +inf).
+ *      - `const int xdim`: how many excitons in basis; xdim = nsdim = nspn * nkpts * dimC * dimV.
+ * @params[out]:
+ *      - complex<double> xtdm_c: output matrix with size of [xdim * 3 * 4];
+ *
+ * NOTES:
+ *  - `xtdm_c` uhould be pre-allocated with the length of [xdim * 3 * 4] before calling this function.
+ *  - `xtdm_c` will be overwritten after calling this function.
+ *  - `xtdm_c` unit (<c|r|v>): Angstrom.
+ *
+ *  Since only first col&row needs LMI for now, this function should be called with
+ *      (0 == myprow_group) && (0 == mypcol_group)
+ *
+ * @author: Ionizing
+ * @date: 2025 Nov 1
+ */
+void ReadExcitonTDMC(const char *filename, const int t_ion, const int xdim,
+                     complex<double> *xtdm_c) {
+    // THIS FUNCTION SHOULD BE CALLED WITHIN THE PROCESS WITH 1st ROW and 1st COL.
+    if ((0 != myprow_group) && (0 != mypcol_group)) {
+        MPI_Barrier(group_comm);
+        return;
     }
+
+    ifstream inf(filename, ios::in|ios::binary);
+    if(!inf.is_open()) { cerr << "ERROR: " << filename << " can't open in tdcft.cpp::ReadExcitonTDMC" << endl; exit(1); }
+
+    // copied from ReadOnsiteC
+    int t_stru = (t_ion - 1) % (2 * (totstru - 1)) + 1;          // loop order: {1 ~ (totstru - 1), (totstru - 1) ~ 1}
+    if(t_stru > totstru - 1) t_stru = 2 * totstru - 1 - t_stru ; // period: 2(totstru - 1)
+
+    const size_t record_length = xdim * 3 * 4;
+    const size_t ipos = record_length * (t_stru - 1);
+    inf.seekg(sizeof(complex<double>) * ipos, ios::beg);
+
+    // We assert xtdm_c is alloced with length of [xdim * 3 * 4]
+    inf.read((char*)xtdm_c, sizeof(complex<double>) * record_length);
     inf.close();
     MPI_Barrier(group_comm);
     return;
@@ -913,6 +937,12 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                 totnspns, totnkpts, totnbnds, 
                 c_onsite);
     for(int t_ele = 0; t_ele < neleint / 2; t_ele++) {
+        // TODO
+        // Add light-matter interaction to c_onsite on each t_ele
+        // Hlmi = e \vec{E} \cdot \vec{r}_ij
+        //
+        // UpdateExcitonLMI()
+        //
         Mat_CtoA(c_onsite, c_midsite, mirror_onsitec, mirror_midsitec,
                  - neleint / 2, t_ele, h, neleint, nstates, a0, a1, a2, a3);
         if(intalgo == "Euler") A0Coeff(nstates, h, a0, coeff); // usually for test
@@ -926,6 +956,12 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                  totnspns, totnkpts, totnbnds, 
                  c_midsite);
     for(int t_ele = neleint / 2; t_ele < neleint; t_ele++) {
+        // TODO
+        // Add light-matter interaction to c_onsite on each t_ele
+        // Hlmi = e \vec{E} \cdot \vec{r}_ij
+        //
+        // UpdateExcitonLMI()
+        //
         Mat_CtoA(c_onsite, c_midsite, mirror_onsitec, mirror_midsitec, 
                  + neleint / 2, t_ele, h, neleint, nstates, a0, a1, a2, a3);
         if(intalgo == "Euler") A0Coeff(nstates, h, a0, coeff);
