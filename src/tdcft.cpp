@@ -673,6 +673,48 @@ void ReadExcitonTDMC(const char *filename, const int t_ion, const int xdim,
 }
 
 
+/*!
+ * @brief Calculte LMI and add it to c_onsite for each t_ele step.
+ */
+void AddExcitonLMI_ele(const int t_ion, const int t_ele, const int xdim,
+                       const complex<double> *xtdm_c,
+                       const vector<EField>& efield_t,
+                       complex<double>** c_onsite) {
+    // Get local row&col index for distributed Hamiltonian
+    const int ndim_loc_row = Numroc(xdim, MB_ROW, myprow_group, nprow_group);
+    const int ndim_loc_col = Numroc(xdim, NB_COL, mypcol_group, npcol_group);
+
+    // TODO
+    const int currentstep = t_ion * neleint + t_ele;
+    const EField Etmp = efield_t[currentstep];
+    const double E[3] = {Etmp.x, Etmp.y, Etmp.z};
+
+    vector<complex<double>> lmi_c = vector<complex<double>>(xdim, {0.0, 0.0});
+    for (int iorder=0; iorder!=4; ++iorder) {
+        const int orderpos = iorder * xdim * 3;
+        for (int idirect=0; idirect!=3; ++idirect) {
+            const int directpos = orderpos + xdim * idirect;
+            for (int ix=0; ix!=xdim; ++ix) {
+                 lmi_c[ix] += E[idirect] * xtdm_c[directpos + ix];
+            }
+        }
+        // Copy lmi_c to first row&col of c_onsite
+        //if ()
+
+        // for(int ix=0; ix!=xdim; ++ix) {
+        //     BlacsIdxglb2loc() -> iprow, ii_loc_row
+        //     BlacsIdxglb2loc() -> jpcol, jj_loc_col
+        //     if(myprow_group == iprow && 0 == myprow_group) {
+        //         ......
+        //     }
+        //     if(mypcol_group == jpcol && 0 == mypcol_group) {
+        //         ......
+        //     }
+        // }
+    }
+}
+
+
 void ReadOnsiteC(const int t_ion, const int matsize,
                  const int nspns, const int nkpts, const int dimC, const int dimV,
                  vector<int> &allispns, vector<int> &allikpts, const int *ibndstart,

@@ -668,8 +668,9 @@ void Blacs_MatrixZScatter(const int m, const int n,
 
 void Blacs_MatrixISum(const int ConTxt, const char *scope, const char *top, const int m, const int n,
                       int *A, const int lda, const int rdest, const int cdest) {
-    if(m > 0 && n > 0 && lda > 0)
-    igsum2d(&ConTxt, scope, top, &m, &n, A, &lda, &rdest, &cdest);
+    if(m > 0 && n > 0 && lda > 0) {
+        igsum2d(&ConTxt, scope, top, &m, &n, A, &lda, &rdest, &cdest);
+    }
     return;
 }
 

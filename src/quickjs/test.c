@@ -175,7 +175,7 @@ int main() {
         } else {
             EField* efield = JS_GetOpaque(result, js_efield_data_class_id);
             if (efield) {
-                printf("Returned Efield: x=%.2lf y=%.2lf z=%.2lf\n", efield->x, efield->y, efield->z);
+                printf("Returned Efield: x=%+.2lf y=%+.2lf z=%+.2lf\n", efield->x, efield->y, efield->z);
             } else {
                 printf("Returned value is not JSEfieldData\n");
                 return 2;
