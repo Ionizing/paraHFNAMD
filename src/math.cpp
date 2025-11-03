@@ -511,6 +511,7 @@ void Blacs_ColZBroadcast(complex<double> **data, const int ndata, const int *m, 
     int *nn = new int[ndata];
     for(int i = 0; i < ndata; i++) nn[i] = n;
     Blacs_ColZBroadcast(data, ndata, m, nn, lda, ctxt, myprow, mypcol, npcol);
+    delete[] nn;
     return;
 }
 
@@ -535,6 +536,7 @@ void Blacs_ColZBroadcast(vector< complex<double> > *data, const int ndata, const
     int *nn = new int[ndata];
     for(int i = 0; i < ndata; i++) nn[i] = n;
     Blacs_ColZBroadcast(data, ndata, m, nn, lda, ctxt, myprow, mypcol, npcol);
+    delete[] nn;
     return;
 }
 

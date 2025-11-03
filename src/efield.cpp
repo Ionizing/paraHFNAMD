@@ -255,3 +255,31 @@ void init_efield(const std::string& jsfname, int namdtim, int neleint) {
 
     MPI_Bcast(efields.data(), veclength * 3, MPI_DOUBLE, world_root, world_comm);
 }
+
+void write_efield(const std::string& fname) {
+    if (is_world_root && has_efield) {
+
+        FILE* fp = fopen(fname.c_str(), "w");
+        if (nullptr == fp) {
+            std::cerr << "Cannot open " << fname << " to write efields data." << std::endl;
+            exit(1);
+        }
+
+        fprintf(fp, "#  Time(fs)  |   Ex           Ey          Ez  (V/A)  |\n");
+
+        const double dt = iontime / neleint;
+        int cnt = 0;
+        for (int t_ion=0; t_ion!=namdtim; ++t_ion) {
+            for (int t_ele=0; t_ele!=neleint; ++t_ele) {
+                const double t = t_ion * iontime + t_ele * neleint;
+                fprintf(fp, "%12.3lf   %12.6lf %12.6lf %12.6lf\n",
+                        t, efields[cnt].x, efields[cnt].y, efields[cnt].z);
+                ++cnt;
+            }
+        }
+
+        fclose(fp);
+    }
+
+    MPI_Barrier(world_comm);
+}

@@ -21,5 +21,6 @@ extern std::vector<EField> efields;
 //void destroy_engine();
 
 void init_efield(const std::string& jsfname, int namdtim, int neleint);
+void write_efield(const char* fname);
 
 #endif // EFIELD_H

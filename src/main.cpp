@@ -299,6 +299,7 @@ int main(int argc, char *argv[]) {
     // Initialize efield stuff if necessary
     if (has_efield) {
         init_efield(efield_fname, namdtim, neleint);
+        write_efield(resdir + "/EFIELDS.txt");
     }
 
     // task
@@ -307,7 +308,7 @@ int main(int argc, char *argv[]) {
     if(is_world_root) WriteOutput(0); MPI_Barrier(world_comm);
     if(taskmod == "fssh" || taskmod == "dish" || taskmod == "dcsh") {
         DynamicsMatrixConstruct();
-        if(is_sub_calc && (laststru == struend)); // should do phase correction
+        if(is_sub_calc && (laststru == struend)) {} // should do phase correction
         if(totstru > 2 && ( !is_sub_calc || (laststru == struend) )) BuildAllTDMatSplineCoeff();
         if(totstru > 2 && namdtim > 1 && nsample > 0) RunDynamics();
     }

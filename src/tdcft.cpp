@@ -69,9 +69,10 @@ void InterpolationForTDMat(const int ntimes, const double time_interval,
         // now shape of all_splcoeff is [(ntimes + 1) * 4, nelements] with column-major
     }
     // if w/o suffix, means no need merging for different "istart" segment, do a transpose here
-    if(!is_istart_suffix) // is_add_extra_splinecoeff = false
-    Dimatcopy("CblasRowMajor", "CblasTrans", nelements, (ntimes - 1) * 4,
-              1.0, spline_coeff, (ntimes - 1) * 4, nelements);
+    if(!is_istart_suffix) { // is_add_extra_splinecoeff = false
+        Dimatcopy("CblasRowMajor", "CblasTrans", nelements, (ntimes - 1) * 4,
+                  1.0, spline_coeff, (ntimes - 1) * 4, nelements);
+    }
     // after transpose, the shape is regard as [nelements, (ntimes - 1) x 4] with column-major
     
     // write to file
@@ -683,35 +684,48 @@ void AddExcitonLMI_ele(const int t_ion, const int t_ele, const int xdim,
     // Get local row&col index for distributed Hamiltonian
     const int ndim_loc_row = Numroc(xdim, MB_ROW, myprow_group, nprow_group);
     const int ndim_loc_col = Numroc(xdim, NB_COL, mypcol_group, npcol_group);
+    const int start_idx = 1;    // Hamil[0, 0] is the ground state.
+    const int dim_loc = Numroc(xdim+start_idx, MB_ROW, myprow_group, nprow_group);
+    int iprow, jpcol;
+    int ii_loc_row, jj_loc_col;
 
     // TODO
     const int currentstep = t_ion * neleint + t_ele;
     const EField Etmp = efield_t[currentstep];
     const double E[3] = {Etmp.x, Etmp.y, Etmp.z};
 
-    vector<complex<double>> lmi_c = vector<complex<double>>(xdim, {0.0, 0.0});
+    // Loop over cubic interpolation orders
     for (int iorder=0; iorder!=4; ++iorder) {
         const int orderpos = iorder * xdim * 3;
-        for (int idirect=0; idirect!=3; ++idirect) {
-            const int directpos = orderpos + xdim * idirect;
-            for (int ix=0; ix!=xdim; ++ix) {
-                 lmi_c[ix] += E[idirect] * xtdm_c[directpos + ix];
+
+        // Loop over all excitons
+        for(int ix=0; ix!=xdim; ++ix) {
+            const int xpos = orderpos + ix;
+            complex<double> lmi_c = {0.0, 0.0};
+
+            // Loop over x, y and z
+            for (int idirect=0; idirect!=3; ++idirect) {
+                const int pos = xpos + xdim * idirect;
+                lmi_c += E[idirect] * xtdm_c[pos];
+            }
+
+            BlacsIdxglb2loc(ix + start_idx, iprow, ii_loc_row, 0, xdim+start_idx, MB_ROW, nprow_group);
+            BlacsIdxglb2loc(ix + start_idx, iprow, jj_loc_col, 0, xdim+start_idx, NB_COL, npcol_group);
+
+            // irow == 0, fill in the first col
+            if(myprow_group == iprow && 0 == myprow_group) {
+                c_onsite[iorder][ii_loc_row] += lmi_c;
+            }
+
+            // icol == 0, fill in the first row
+            if(mypcol_group == jpcol && 0 == mypcol_group) {
+                c_onsite[iorder][jj_loc_col * dim_loc] += conj(lmi_c);
             }
         }
-        // Copy lmi_c to first row&col of c_onsite
-        //if ()
-
-        // for(int ix=0; ix!=xdim; ++ix) {
-        //     BlacsIdxglb2loc() -> iprow, ii_loc_row
-        //     BlacsIdxglb2loc() -> jpcol, jj_loc_col
-        //     if(myprow_group == iprow && 0 == myprow_group) {
-        //         ......
-        //     }
-        //     if(mypcol_group == jpcol && 0 == mypcol_group) {
-        //         ......
-        //     }
-        // }
     }
+
+    MPI_Barrier(group_comm);
+    return;
 }
 
 
