@@ -1,5 +1,5 @@
 EXE = HFNAMD
-CC = mpiicpc
+CXX = mpiicpc
 
 CFLAGS = -g -O2 -std=c++20
 OMP_FLAG = -qopenmp
@@ -38,7 +38,7 @@ SRC =        fn.cpp \
 OBJ = $(SRC:%.cpp=%.o)
 
 $(EXE): $(OBJ) libfftw3x_cdft_lp64.a libqjs.a
-	$(CC) $(CFLAGS) $(INTELFLAGS) $(LIB) $^ -o $@ && cp -f $(EXE) ..
+	$(CXX) $(CFLAGS) $(INTELFLAGS) $(LIB) $^ -o $@ && cp -f $(EXE) ..
 
 libfftw3x_cdft_lp64.a: fftw3x_cdft
 	cd $< && $(MAKE) libintel64 MKLROOT=$(MKLROOT) INSTALL_DIR=".." && cd ..
@@ -50,10 +50,10 @@ fftw3x_cdft:
 	cp -r $(MKLROOT)/interfaces/$@ .
 
 %.o: %.cpp w3j.h
-	$(CC) $(CFLAGS) $(OMP_FLAG) $(INC) -c $< -o $@
+	$(CXX) $(CFLAGS) $(OMP_FLAG) $(INC) -c $< -o $@
 
 w3j.h:
-	$(CC) to_w3j_h.cpp -o to_w3j_h && ./to_w3j_h
+	$(CXX) to_w3j_h.cpp -o to_w3j_h && ./to_w3j_h
 
 clean: 
 	rm -f *.o */*.o to_w3j_h w3j.h $(EXE)
