@@ -1,4 +1,4 @@
-CC ?= gcc
+CC = gcc
 CFLAGS ?= -g -O2 -DQJS_BUILD_LIBC
 
 .PHONY: clean
