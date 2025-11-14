@@ -116,7 +116,12 @@ TIMECOST WVCAdvanProcess(waveclass *&wvc, excitonclass *extc, const int num) {
                 assert(src2.is_open()); assert(dst2.is_open());
                 dst2 << src2.rdbuf();
                 src2.close(); dst2.close();
-
+                
+                ifstream src3( (           "tmpDiagonal/" + Int2Str(num)).c_str(), ios::in|ios::binary );
+                ofstream dst3( (namddir + "/tmpDiagonal/" + Int2Str(num)).c_str(), ios::out|ios::binary );
+                assert(src3.is_open()); assert(dst3.is_open());
+                dst3 << src3.rdbuf();
+                src3.close(); dst3.close();
             }
             MPI_Barrier(group_comm);
         }

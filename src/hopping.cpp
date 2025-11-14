@@ -1,4 +1,5 @@
 #include "hopping.h"
+#include "efield.h"
 
 void NormalizeProbability(double *probmat, const int nstates, const bool is_reset_diag) {
 /* normalize the probability matrix column by column */
@@ -183,12 +184,15 @@ void DetailBalanceProb(double *probmat, const complex<double> *vmat,
     return;
 }
 
-void PopuUpdateFSSH(const int nstates, const complex<double> *coeff,
+void PopuUpdateFSSH(const int t_ion, const int nstates, const complex<double> *coeff,
                     double *population, // update in this routine
                     complex<double> **c_onsite, complex<double> **c_midsite,
                     double *probmat, complex<double> *vmat, const double temp) {
     FSSHprob(probmat, vmat, nstates, c_onsite, c_midsite, coeff);
-    DetailBalanceProb(probmat, vmat, nstates, temp);
+    // Avoid detailed balance probability correction when optical field exists.
+    if (!has_efield || !does_optical_field_exist(t_ion, neleint)) {
+        DetailBalanceProb(probmat, vmat, nstates, temp);
+    }
     const int ndim_loc_row = Numroc(nstates, MB_ROW, myprow_group, nprow_group);
     double *vectmp = new double[mypcol_group == 0 ? max(ndim_loc_row, 1) : 1];
     if(mypcol_group == 0) {

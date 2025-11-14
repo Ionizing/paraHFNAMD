@@ -19,7 +19,7 @@ void FSSHprob(double *probmat, complex<double> *vmat,
               const complex<double> *coeff);
 void DetailBalanceProb(double *probmat, const complex<double> *vmat,
                        const int nstates, const double temp);
-void PopuUpdateFSSH(const int nstates, const complex<double> *coeff,
+void PopuUpdateFSSH(const int t_ion, const int nstates, const complex<double> *coeff,
                     double *population, // update in this routine
                     complex<double> **c_onsite, complex<double> **c_midsite,
                     double *probmat, complex<double> *vmat, const double temp);

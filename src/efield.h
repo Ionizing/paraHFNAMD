@@ -22,5 +22,6 @@ extern std::vector<EField> efields;
 
 void init_efield(const std::string& jsfname, int namdtim, int neleint);
 void write_efield(const std::string& fname);
+bool does_optical_field_exist(const int t_ion, const int neleint);
 
 #endif // EFIELD_H

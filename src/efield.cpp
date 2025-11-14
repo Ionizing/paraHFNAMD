@@ -283,3 +283,9 @@ void write_efield(const std::string& fname) {
 
     MPI_Barrier(world_comm);
 }
+
+bool does_optical_field_exist(const int t_ion, const int neleint) {
+    EField e = efields[t_ion * neleint];
+    double norm = sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
+    return norm > 1E-6 ;
+}

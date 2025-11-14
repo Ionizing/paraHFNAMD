@@ -636,7 +636,7 @@ void RunDynamics() {
                 CoeffUpdate(h, t_ion, nstates, nspns, nkpts, dimC, dimV,
                             allispns, allikpts, ibndstart, totnspns, totnkpts, totnbnds, 
                             c_onsite, c_midsite, coeff, 1, a0, a1, a2, a3, om_oih);
-                PopuUpdateFSSH(nstates, coeff, population, 
+                PopuUpdateFSSH(t_ion - begtime,  nstates, coeff, population, 
                                c_onsite, c_midsite, probmat, vmat, dyntemp);
                 WritePzvec(outFileC, nstates, ndim_loc_row, coeff, fullcoeff, t_ion < begtime + namdtim - 2);
                 WritePdvec(outFileP, nstates, ndim_loc_row, population, fullpopu, t_ion < begtime + namdtim - 2);
