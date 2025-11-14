@@ -136,7 +136,7 @@ static void init_engine(const std::string& fname) {
     js_std_add_helpers(CTX, 0, NULL);
 
     char* jscode = read_file(fname.c_str());
-    JS_Eval(CTX, jscode, strlen(jscode), "efield.js", JS_EVAL_TYPE_GLOBAL);
+    JS_Eval(CTX, jscode, strlen(jscode), fname.c_str(), JS_EVAL_TYPE_GLOBAL);
     free(jscode);
 
     if (JS_IsNull(FN)) {
@@ -167,6 +167,8 @@ static EField get_efield(const double t) {
 
     JSValue arg[1];
     JSValue result = JS_NULL;
+
+    arg[0] = JS_NewFloat64(CTX, t);
     result = JS_Call(CTX, FN, JS_UNDEFINED, 1, arg);
     if (JS_IsException(result)) {
         JSValue ex = JS_GetException(CTX);
@@ -200,6 +202,7 @@ static std::vector<EField> get_efield_array(const std::vector<double>& ts) {
     JSValue arg[1];
     JSValue result = JS_NULL;
     for (double t: ts) {
+        arg[0] = JS_NewFloat64(CTX, t);
         result = JS_Call(CTX, FN, JS_UNDEFINED, 1, arg);
         if (JS_IsException(result)) {
             JSValue ex = JS_GetException(CTX);
@@ -225,32 +228,25 @@ static std::vector<EField> get_efield_array(const std::vector<double>& ts) {
     return ret;
 }
 
-
-static void set_efield_array(const std::vector<double>& ts) {
-    // efield.h:  extern efields
-    efields = get_efield_array(ts);
-}
-
 void init_efield(const std::string& jsfname, int namdtim, int neleint) {
     int veclength = namdtim * neleint;
 
     if (is_world_root) {
         std::vector<double> ts = std::vector<double>(veclength, 0.0);
         int cnt = 0;
-        double timestep = double(iontime) / double(neleint);    // Time step for each electron time
+        double timestep = iontime / double(neleint);    // Time step for each electron time
         for (int inamdtim=0; inamdtim<namdtim; ++inamdtim) {
-            for (int iele; iele<neleint; ++iele) {
+            for (int iele=0; iele<neleint; ++iele) {
                 ts[cnt] = inamdtim * iontime + iele * timestep;
                 ++cnt;
-                
             }
         }
 
         init_engine(jsfname);
-        set_efield_array(ts);
+        efields = get_efield_array(ts);     // efield.h:  extern efields
         destroy_engine();
     } else {
-        efields = std::vector<EField>(veclength, {0.0, 0.0, 0.0});
+        efields = std::vector<EField>(veclength, {0.0, 0.0, 0.0});  // efield.h:  extern efields
     }
 
     MPI_Bcast(efields.data(), veclength * 3, MPI_DOUBLE, world_root, world_comm);
@@ -271,7 +267,7 @@ void write_efield(const std::string& fname) {
         int cnt = 0;
         for (int t_ion=0; t_ion!=namdtim; ++t_ion) {
             for (int t_ele=0; t_ele!=neleint; ++t_ele) {
-                const double t = t_ion * iontime + t_ele * neleint;
+                const double t = t_ion * iontime + t_ele * dt;
                 fprintf(fp, "%12.3lf   %12.6lf %12.6lf %12.6lf\n",
                         t, efields[cnt].x, efields[cnt].y, efields[cnt].z);
                 ++cnt;

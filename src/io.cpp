@@ -351,7 +351,7 @@ void ReadInput(const char *input) {
         if (efield_fname.empty()) {
             CERR << "You enabled 'has_efield', which requires 'efield_fname' to be a valid file, please check." << endl; EXIT(1);
         }
-        if (carrier != "exciton") {
+        if ("exciton" != carrier && 0 != lrecomb) {
             CERR << "External optical field only works for exciton mode." << endl; EXIT(1);
         }
     }

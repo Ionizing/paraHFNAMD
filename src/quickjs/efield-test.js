@@ -14,5 +14,3 @@ function efield(t) {
 
     return new EField(x, y, z);
 }
-
-glaobalThis.efield = efield;

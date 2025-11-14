@@ -296,16 +296,17 @@ int main(int argc, char *argv[]) {
         MPI_Barrier(world_comm);
     } while(1);*/
 
+    // task
+    CreatWorkDir(world_rk, world_sz, world_comm);
+    double tstart, tend; tstart = omp_get_wtime();
+    if(is_world_root) WriteOutput(0); MPI_Barrier(world_comm);
+
     // Initialize efield stuff if necessary
     if (has_efield) {
         init_efield(efield_fname, namdtim, neleint);
         write_efield(resdir + "/EFIELDS.txt");
     }
 
-    // task
-    CreatWorkDir(world_rk, world_sz, world_comm);
-    double tstart, tend; tstart = omp_get_wtime();
-    if(is_world_root) WriteOutput(0); MPI_Barrier(world_comm);
     if(taskmod == "fssh" || taskmod == "dish" || taskmod == "dcsh") {
         DynamicsMatrixConstruct();
         if(is_sub_calc && (laststru == struend)) {} // should do phase correction
