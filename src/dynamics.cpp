@@ -574,6 +574,7 @@ void RunDynamics() {
         c_onsite[i]  = new complex<double>[max(mn_loc, (size_t)1)]();
         c_midsite[i] = new complex<double>[max(mn_loc, (size_t)1)]();
     }
+    complex<double> *xtdm_c = nullptr;      // Exicton TDM spline coefficients, only work for exciton+laser.
     complex<double> *a0 = new complex<double>[max(mn_loc, (size_t)1)]();
     complex<double> *a1 = new complex<double>[max(mn_loc, (size_t)1)]();
     complex<double> *a2 = new complex<double>[max(mn_loc, (size_t)1)]();
@@ -583,6 +584,11 @@ void RunDynamics() {
     complex<double> *vmat = new complex<double>[max(mn_loc, (size_t)1)]();
     /*vector<int> locbeg, glbbeg, bcklen;
     BlacsBegidxBlocklen(myprow_group, nprow_group, nstates, MB_ROW, locbeg, glbbeg, bcklen);*/
+
+    if ("exciton" == carrier && lrecomb != 0 && has_efield) {
+        const int xdim = nspns * nkpts * dimC * dimV;
+        xtdm_c = new complex<double>[xdim * 3 * 4]();
+    }
 
     /// dish/dcsh: determine decorate
     double *decorate = NULL;
@@ -635,7 +641,7 @@ void RunDynamics() {
             for(int t_ion = begtime; t_ion < begtime + namdtim - 1; t_ion++) {
                 CoeffUpdate(h, t_ion, nstates, nspns, nkpts, dimC, dimV,
                             allispns, allikpts, ibndstart, totnspns, totnkpts, totnbnds, 
-                            c_onsite, c_midsite, coeff, 1, a0, a1, a2, a3, om_oih);
+                            c_onsite, c_midsite, xtdm_c, coeff, 1, a0, a1, a2, a3, om_oih);
                 PopuUpdateFSSH(t_ion - begtime,  nstates, coeff, population, 
                                c_onsite, c_midsite, probmat, vmat, dyntemp);
                 WritePzvec(outFileC, nstates, ndim_loc_row, coeff, fullcoeff, t_ion < begtime + namdtim - 2);
@@ -665,7 +671,7 @@ void RunDynamics() {
                 for(int t_ion = begtime; t_ion < begtime + namdtim - 1; t_ion++) {
                     CoeffUpdate(h, t_ion, nstates, nspns, nkpts, dimC, dimV,
                                 allispns, allikpts, ibndstart, totnspns, totnkpts, totnbnds, 
-                                c_onsite, c_midsite, coeff, ntrajs, a0, a1, a2, a3, om_oih);
+                                c_onsite, c_midsite, xtdm_c, coeff, ntrajs, a0, a1, a2, a3, om_oih);
                     if(taskmod == "dish") {
                         CalcDecoTime(nstates, ntrajs, ndim_loc_row, ntrajs_loc_col,
                                      decorate, coeff, decotime);

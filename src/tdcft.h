@@ -79,6 +79,7 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                  vector<int> &allispns, vector<int> &allikpts, const int *ibndstart,
                  const int totnspns, const int totnkpts, const int totnbnds,
                  complex<double> **c_onsite, complex<double> **c_midsite,
+                 complex<double>* xtdm_c,
                  complex<double> *coeff, const int ntrajs,
                  complex<double> *a0, complex<double> *a1, complex<double> *a2, complex<double> *a3,
                  complex<double> *om_oih);

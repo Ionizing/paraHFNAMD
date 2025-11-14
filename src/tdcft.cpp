@@ -649,9 +649,11 @@ void ReadCtoVNAC(const char *filename, const int itime,
  */
 void ReadExcitonTDMC(const char *filename, const int t_ion, const int xdim,
                      complex<double> *xtdm_c) {
-    // THIS FUNCTION SHOULD BE CALLED WITHIN THE PROCESS WITH 1st ROW and 1st COL.
-    if ((0 != myprow_group) && (0 != mypcol_group)) {
-        MPI_Barrier(group_comm);
+    const size_t record_length = xdim * 3 * 4;
+
+    // THIS FUNCTION SHOULD BE CALLED WITHIN ROOT PROCESS.
+    if (!is_world_root) {
+        MPI_Bcast(xtdm_c, record_length, MPI_DOUBLE_COMPLEX, world_root, world_comm);
         return;
     }
 
@@ -662,14 +664,13 @@ void ReadExcitonTDMC(const char *filename, const int t_ion, const int xdim,
     int t_stru = (t_ion - 1) % (2 * (totstru - 1)) + 1;          // loop order: {1 ~ (totstru - 1), (totstru - 1) ~ 1}
     if(t_stru > totstru - 1) t_stru = 2 * totstru - 1 - t_stru ; // period: 2(totstru - 1)
 
-    const size_t record_length = xdim * 3 * 4;
     const size_t ipos = record_length * (t_stru - 1);
     inf.seekg(sizeof(complex<double>) * ipos, ios::beg);
 
     // We assert xtdm_c is alloced with length of [xdim * 3 * 4]
     inf.read((char*)xtdm_c, sizeof(complex<double>) * record_length);
     inf.close();
-    MPI_Barrier(group_comm);
+    MPI_Bcast(xtdm_c, record_length, MPI_DOUBLE_COMPLEX, world_root, world_comm);
     return;
 }
 
@@ -689,7 +690,6 @@ void AddExcitonLMI_ele(const int t_ion, const int t_ele, const int xdim,
     int iprow, jpcol;
     int ii_loc_row, jj_loc_col;
 
-    // TODO
     const int currentstep = t_ion * neleint + t_ele;
     const EField Etmp = efield_t[currentstep];
     const double E[3] = {Etmp.x, Etmp.y, Etmp.z};
@@ -972,6 +972,7 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                  vector<int> &allispns, vector<int> &allikpts, const int *ibndstart,
                  const int totnspns, const int totnkpts, const int totnbnds,
                  complex<double> **c_onsite, complex<double> **c_midsite,
+                 complex<double>* xtdm_c,
                  complex<double> *coeff, const int ntrajs,
                  complex<double> *a0, complex<double> *a1, complex<double> *a2, complex<double> *a3,
                  complex<double> *om_oih) {
@@ -992,13 +993,19 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                 allispns, allikpts, ibndstart,
                 totnspns, totnkpts, totnbnds, 
                 c_onsite);
+
+    const int xdim = nspns * nkpts * dimC * dimV;
+    if ("exciton" == carrier && 0 != lrecomb && has_efield) {
+        ReadExcitonTDMC((namddir + "/tmpTDM/").c_str(), t_ion, xdim, xtdm_c);
+    }
+
     for(int t_ele = 0; t_ele < neleint / 2; t_ele++) {
-        // TODO
         // Add light-matter interaction to c_onsite on each t_ele
         // Hlmi = e \vec{E} \cdot \vec{r}_ij
-        //
-        // UpdateExcitonLMI()
-        //
+        if ("exciton" == carrier && lrecomb != 0 && has_efield) {
+            AddExcitonLMI_ele(t_ion, t_ele, xdim, xtdm_c, efields, c_onsite);
+        }
+
         Mat_CtoA(c_onsite, c_midsite, mirror_onsitec, mirror_midsitec,
                  - neleint / 2, t_ele, h, neleint, nstates, a0, a1, a2, a3);
         if(intalgo == "Euler") A0Coeff(nstates, h, a0, coeff); // usually for test
@@ -1012,12 +1019,12 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                  totnspns, totnkpts, totnbnds, 
                  c_midsite);
     for(int t_ele = neleint / 2; t_ele < neleint; t_ele++) {
-        // TODO
         // Add light-matter interaction to c_onsite on each t_ele
         // Hlmi = e \vec{E} \cdot \vec{r}_ij
-        //
-        // UpdateExcitonLMI()
-        //
+        if ("exciton" == carrier && lrecomb != 0 && has_efield) {
+            AddExcitonLMI_ele(t_ion, t_ele, xdim, xtdm_c, efields, c_onsite);
+        }
+
         Mat_CtoA(c_onsite, c_midsite, mirror_onsitec, mirror_midsitec, 
                  + neleint / 2, t_ele, h, neleint, nstates, a0, a1, a2, a3);
         if(intalgo == "Euler") A0Coeff(nstates, h, a0, coeff);
@@ -1062,19 +1069,25 @@ void SetIniCoeff(complex<double> *coeff, double *population,
             ibnd = FindIndex(allbands[ispn], bnd); // start from "0"
             inistates.push_back(ispn * numkpts * nnbnds + ikpt * nnbnds + ibnd);
         } else if(carrier == "exciton") {
-            // If user specified ground state as initial state
-            spn = stoi(vecstrtmp[1 + 5 * inv]);
-            kpt = stoi(vecstrtmp[1 + 5 * inv + 1]); 
-            cbd = stoi(vecstrtmp[1 + 5 * inv + 2]); 
-            vbd = stoi(vecstrtmp[1 + 5 * inv + 3]); 
-            if(nvinidc > 1) iniweight.push_back(stod(vecstrtmp[1 + 4 * inv + 3]));
-            else iniweight.push_back(1.0);
-            ispn = spn;
-            ikpt = FindIndex(Kpoints, kpt);        // start from "0"
-            icbd = FindIndex(allbands[ispn], cbd); // start from "0"
-            ivbd = FindIndex(allbands[ispn], vbd) - dimC; // start from "0"
-            const int iground = ( lrecomb ? 1 : 0 ); 
-            inistates.push_back(ispn * nkpts * dimC * dimV + ikpt * dimC * dimV + icbd * dimV + ivbd + iground);
+            int spin_index = stoi(vecstrtmp[1 + 5 * inv]);
+            if (spin_index < 0) {           // If user specified ground state as initial state
+                assert(lrecomb != 0);
+                iniweight.push_back(1.0);
+                inistates.push_back(0);
+            } else {
+                spn = stoi(vecstrtmp[1 + 5 * inv]);
+                kpt = stoi(vecstrtmp[1 + 5 * inv + 1]); 
+                cbd = stoi(vecstrtmp[1 + 5 * inv + 2]); 
+                vbd = stoi(vecstrtmp[1 + 5 * inv + 3]); 
+                if(nvinidc > 1) iniweight.push_back(stod(vecstrtmp[1 + 4 * inv + 3]));
+                else iniweight.push_back(1.0);
+                ispn = spn;
+                ikpt = FindIndex(Kpoints, kpt);        // start from "0"
+                icbd = FindIndex(allbands[ispn], cbd); // start from "0"
+                ivbd = FindIndex(allbands[ispn], vbd) - dimC; // start from "0"
+                const int iground = ( lrecomb ? 1 : 0 ); 
+                inistates.push_back(ispn * nkpts * dimC * dimV + ikpt * dimC * dimV + icbd * dimV + ivbd + iground);
+            }
         } else {}
     }
 
