@@ -477,6 +477,12 @@ void WriteOutput(const int flag, const char *info, const int inNKPTS, const char
         Output1(otf, "lrecomb", lrecomb, "recombination option: 0-not recombine, 1-nonradiative, 2-radiative, 3-both");
         break;
 
+        case 5: // optical field exists
+        Output1(otf, "has_efield", has_efield, "Does optical field imposed to this system");
+        Output1(otf, "efield_fname", efield_fname, "File name for optical field description");
+        break;
+
+
         default: break;
     }
 
@@ -535,6 +541,10 @@ void CheckBasisSets(waveclass &wvc) {
         WriteOutput(110);
         if(carrier == "exciton" && is_bse_calc) WriteOutput(3);
         WriteOutput(2);
+
+        if(has_efield) {
+            WriteOutput(5);
+        }
     }
 
     return;
@@ -561,6 +571,7 @@ bool CreatNAMDdir(waveclass &wvc) {
                 mkdir((namddir + "/tmpCBNAC").c_str(), S_IRWXU);
                 mkdir((namddir + "/tmpVBNAC").c_str(), S_IRWXU);
                 mkdir((namddir + "/tmpC2VNAC").c_str(), S_IRWXU);
+                mkdir((namddir + "/tmpTDM").c_str(), S_IRWXU);
                 if(is_bse_calc) {
                     mkdir((namddir + "/tmpDirect").c_str(), S_IRWXU);
                     mkdir((namddir + "/tmpExchange").c_str(), S_IRWXU);
@@ -667,6 +678,7 @@ void CheckIniconFile(vector<int> *&allbands, const char *inicon) {
     int ispn;
     double wght;
     int rndifspns, nkpts, dimC, dimV;
+    bool is_excitation;
     ReadInfoTmp(rndifspns, nkpts, dimC, dimV);
 
     cout << "Checking " << inicon << " file >>>>>> " << flush;
