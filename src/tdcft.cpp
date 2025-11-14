@@ -714,12 +714,12 @@ void AddExcitonLMI_ele(const int t_ion, const int t_ele, const int xdim,
 
             // irow == 0, fill in the first col
             if(myprow_group == iprow && 0 == myprow_group) {
-                c_onsite[iorder][ii_loc_row] += lmi_c;
+                c_onsite[iorder][ii_loc_row] = lmi_c;
             }
 
             // icol == 0, fill in the first row
             if(mypcol_group == jpcol && 0 == mypcol_group) {
-                c_onsite[iorder][jj_loc_col * dim_loc] += conj(lmi_c);
+                c_onsite[iorder][jj_loc_col * dim_loc] = conj(lmi_c);
             }
         }
     }
