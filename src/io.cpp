@@ -678,7 +678,6 @@ void CheckIniconFile(vector<int> *&allbands, const char *inicon) {
     int ispn;
     double wght;
     int rndifspns, nkpts, dimC, dimV;
-    bool is_excitation;
     ReadInfoTmp(rndifspns, nkpts, dimC, dimV);
 
     cout << "Checking " << inicon << " file >>>>>> " << flush;
@@ -703,20 +702,29 @@ void CheckIniconFile(vector<int> *&allbands, const char *inicon) {
                 if(nvinidc > 1) { wght = stod(vecstrtmp[1 + 4 * inv + 3]); assert(wght > 0.0); }
             }
             else if(carrier == "exciton") {
-                spn = stoi(vecstrtmp[1 + 5 * inv]);
-                assert(spn < numspns); // because allspns may have repeated elements, here set spn = ispn
-                ispn = spn;
-                
-                kpt = stoi(vecstrtmp[1 + 5 * inv + 1]); 
-                assert( find(Kpoints.begin(), Kpoints.end(), kpt) != Kpoints.end() );
-                
-                cbd = stoi(vecstrtmp[1 + 5 * inv + 2]); 
-                assert( find(allbands[ispn].begin(), allbands[ispn].begin() + dimC, cbd) 
-                                                  != allbands[ispn].begin() + dimC ); 
+                int spin_index = stoi(vecstrtmp[1 + 5 * inv]);
+                if (spin_index < 0) {
+                    // spn < 0, means on ground state, the other three entries are not used
+                    if (!has_efield || lrecomb == 0) {
+                        cerr << inicon << " file specified ground state as initial state, please trigger on `lrecomb` and `has_efield`.";
+                        exit(1);
+                    }
+                } else {
+                    spn = spin_index;
+                    assert(spn < numspns); // because allspns may have repeated elements, here set spn = ispn
+                    ispn = spn;
+                    
+                    kpt = stoi(vecstrtmp[1 + 5 * inv + 1]); 
+                    assert( find(Kpoints.begin(), Kpoints.end(), kpt) != Kpoints.end() );
+                    
+                    cbd = stoi(vecstrtmp[1 + 5 * inv + 2]); 
+                    assert( find(allbands[ispn].begin(), allbands[ispn].begin() + dimC, cbd) 
+                                                      != allbands[ispn].begin() + dimC ); 
 
-                vbd = stoi(vecstrtmp[1 + 5 * inv + 3]); 
-                assert( find(allbands[ispn].begin() + dimC, allbands[ispn].end(), vbd) 
-                                                         != allbands[ispn].end() ); 
+                    vbd = stoi(vecstrtmp[1 + 5 * inv + 3]); 
+                    assert( find(allbands[ispn].begin() + dimC, allbands[ispn].end(), vbd) 
+                                                             != allbands[ispn].end() ); 
+                }
             }
         } // inv
     } // ii for sample

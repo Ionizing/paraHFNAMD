@@ -1061,8 +1061,8 @@ void SetIniCoeff(complex<double> *coeff, double *population,
             ikpt = FindIndex(Kpoints, kpt);        // start from "0"
             ibnd = FindIndex(allbands[ispn], bnd); // start from "0"
             inistates.push_back(ispn * numkpts * nnbnds + ikpt * nnbnds + ibnd);
-        }
-        else if(carrier == "exciton") {
+        } else if(carrier == "exciton") {
+            // If user specified ground state as initial state
             spn = stoi(vecstrtmp[1 + 5 * inv]);
             kpt = stoi(vecstrtmp[1 + 5 * inv + 1]); 
             cbd = stoi(vecstrtmp[1 + 5 * inv + 2]); 
@@ -1075,7 +1075,7 @@ void SetIniCoeff(complex<double> *coeff, double *population,
             ivbd = FindIndex(allbands[ispn], vbd) - dimC; // start from "0"
             const int iground = ( lrecomb ? 1 : 0 ); 
             inistates.push_back(ispn * nkpts * dimC * dimV + ikpt * dimC * dimV + icbd * dimV + ivbd + iground);
-        }
+        } else {}
     }
 
     const double sumwt = Dasum(nvinidc, (double*)&(iniweight[0]));
