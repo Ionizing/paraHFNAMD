@@ -164,7 +164,8 @@ void DetailBalanceProb(double *probmat, const complex<double> *vmat,
     delete[] vmatk; delete[] vmatj;
     MPI_Barrier(group_comm);
 
-    NormalizeProbability(probmat, nstates, true);
+    // Normalization moved to PopuUpdateFSSH, Ionizing
+    // NormalizeProbability(probmat, nstates, true);
     /*double *mat_full = NULL;
     if(is_sub_root) mat_full = new double[nstates * nstates];
     MPI_Barrier(group_comm);
@@ -193,6 +194,7 @@ void PopuUpdateFSSH(const int t_ion, const int nstates, const complex<double> *c
     if (!has_efield || !does_optical_field_exist(t_ion, neleint)) {
         DetailBalanceProb(probmat, vmat, nstates, temp);
     }
+    NormalizeProbability(probmat, nstates, true);
     const int ndim_loc_row = Numroc(nstates, MB_ROW, myprow_group, nprow_group);
     double *vectmp = new double[mypcol_group == 0 ? max(ndim_loc_row, 1) : 1];
     if(mypcol_group == 0) {
