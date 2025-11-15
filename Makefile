@@ -1,8 +1,6 @@
 EXE = HFNAMD
 
-all: $(EXE)
-
-$(EXE):
+all:
 	cd ./src && $(MAKE)
 
 clean: 
