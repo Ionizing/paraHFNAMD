@@ -707,6 +707,9 @@ void RunDynamics() {
     MPI_Barrier(world_comm);
     
     //// free memory
+    if ("exciton" == carrier && lrecomb != 0 && has_efield) {
+        delete[] xtdm_c;
+    }
     delete[] coeff; delete[] population;
     if(is_sub_root) { delete[] fullcoeff; delete fullpopu; }
     for(int i = 0; i < 4; i++) { delete[] c_onsite[i]; delete[] c_midsite[i]; }
