@@ -256,7 +256,7 @@ void print_help() {
         "  --txtfile <file>   (default: default.txt)\n"
         "  --namdtim <int>    (default: 100)\n"
         "  --neleint <int>    (default: 5)\n"
-        "  --iontime <double> (default: 0.1)\n"
+        "  --iontime <double> (default: 1.0)\n"
         "  --help\n"
     );
 }
