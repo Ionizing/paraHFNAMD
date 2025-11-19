@@ -249,7 +249,27 @@ struct CmdArgs {
 };
 
 
+void print_help() {
+    puts(
+        "Usage:\n"
+        "  --jsfile  <file>   (default: default.js)\n"
+        "  --txtfile <file>   (default: default.txt)\n"
+        "  --namdtim <int>    (default: 100)\n"
+        "  --neleint <int>    (default: 5)\n"
+        "  --iontime <double> (default: 0.1)\n"
+        "  --help\n"
+    );
+}
+
+
 CmdArgs parse_args(int argc, char** argv) {
+    if (1 == argc) {
+        fprintf(stderr, "No arguments provided.\n\n");
+        print_help();
+        exit(0);
+    }
+
+
     CmdArgs args;  // 默认值已经在结构体构造时设定好
 
     const struct option long_options[] = {
@@ -283,14 +303,10 @@ CmdArgs parse_args(int argc, char** argv) {
             args.iontime = std::atof(optarg);
             break;
         case 'h':
-            std::cout << "Usage:\n"
-                      << "  --jsfile  <file>   (default: " << args.jsfile  << ")\n"
-                      << "  --txtfile <file>   (default: " << args.txtfile << ")\n"
-                      << "  --namdtim <int>    (default: " << args.namdtim << ")\n"
-                      << "  --neleint <int>    (default: " << args.neleint << ")\n"
-                      << "  --iontime <double> (default: " << args.iontime << ")\n";
+            print_help();
             exit(0);
         default:
+            print_help();
             exit(EXIT_FAILURE);
         }
     }
