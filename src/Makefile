@@ -37,6 +37,8 @@ SRC =        fn.cpp \
 
 OBJ = $(SRC:%.cpp=%.o)
 
+all: $(EXE) efieldjs2txt.x
+
 $(EXE): $(OBJ) libfftw3x_cdft_lp64.a libqjs.a
 	$(CXX) $(CFLAGS) $(INTELFLAGS) $(LIB) $^ -o $@ && cp -f $(EXE) ..
 
@@ -55,8 +57,12 @@ fftw3x_cdft:
 w3j.h:
 	$(CXX) to_w3j_h.cpp -o to_w3j_h && ./to_w3j_h
 
+efieldjs2txt.x: libqjs.a
+	cd efieldjs2txt && $(MAKE)
+
 clean: 
 	rm -f *.o */*.o to_w3j_h w3j.h $(EXE)
+	cd efieldjs2txt && $(MAKE) clean
 
 veryclean:
 	rm -rf *.o */*.o ../$(EXE) $(EXE) *.a fftw3x_cdft obj_intel64_lp64 to_w3j_h w3j.h

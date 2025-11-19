@@ -2,7 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <string>
-#include "cxxopts.hpp"
+#include <getopt.h>
 #include "../quickjs/quickjs.h"
 #include "../quickjs/quickjs-libc.h"
 
@@ -240,30 +240,75 @@ void write_efield(const std::string& fname, int namdtim, int neleint, double ion
 }
 
 
+struct CmdArgs {
+    std::string jsfile  = {"efield.js"};
+    std::string txtfile = {"EFIELD.txt"};
+    int namdtim         = 3000;
+    int neleint         = 10;
+    double iontime      = 1.0;
+};
+
+
+CmdArgs parse_args(int argc, char** argv) {
+    CmdArgs args;  // 默认值已经在结构体构造时设定好
+
+    const struct option long_options[] = {
+        {"jsfile",   required_argument, 0, 'j'},
+        {"txtfile",  required_argument, 0, 't'},
+        {"namdtim",  required_argument, 0, 'n'},
+        {"neleint",  required_argument, 0, 'e'},
+        {"iontime",  required_argument, 0, 'i'},
+        {"help",     no_argument,       0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    int opt;
+    int option_index = 0;
+
+    while ((opt = getopt_long(argc, argv, "j:t:n:e:i:h", long_options, &option_index)) != -1) {
+        switch (opt) {
+        case 'j':
+            args.jsfile = optarg;
+            break;
+        case 't':
+            args.txtfile = optarg;
+            break;
+        case 'n':
+            args.namdtim = std::atoi(optarg);
+            break;
+        case 'e':
+            args.neleint = std::atoi(optarg);
+            break;
+        case 'i':
+            args.iontime = std::atof(optarg);
+            break;
+        case 'h':
+            std::cout << "Usage:\n"
+                      << "  --jsfile  <file>   (default: " << args.jsfile  << ")\n"
+                      << "  --txtfile <file>   (default: " << args.txtfile << ")\n"
+                      << "  --namdtim <int>    (default: " << args.namdtim << ")\n"
+                      << "  --neleint <int>    (default: " << args.neleint << ")\n"
+                      << "  --iontime <double> (default: " << args.iontime << ")\n";
+            exit(0);
+        default:
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    return args;
+}
+
+
+
 int main(int argc, char* argv[]) {
     std::ios_base::sync_with_stdio(true);
 
-    cxxopts::Options options("efieldjs2txt.x", "Convert efield.js to txt.");
-    options.add_options()
-        ("jsfile", "Input js file name", cxxopts::value<std::string>()->default_value("efield.js"))
-        ("txtfile", "Ouput txt file name", cxxopts::value<std::string>()->default_value("EFIELD.txt"))
-        ("namdtim", "NAMDTIME integer value", cxxopts::value<int>()->default_value("3000"))
-        ("neleint", "NELEINT integer value", cxxopts::value<int>()->default_value("10"))
-        ("iontime", "POTIM double value", cxxopts::value<double>()->default_value("1.0"))
-        ("h,help", "Print usage")
-        ;
-
-    auto opts = options.parse(argc, argv);
-    if (opts.count("help")) {
-        std::cout << options.help() << std::endl;
-        exit(0);
-    }
-
-    std::string jsfile = opts["jsfile"].as<std::string>();
-    std::string txtfile = opts["txtfile"].as<std::string>();
-    int namdtim = opts["namdtim"].as<int>();
-    int neleint = opts["neleint"].as<int>();
-    double iontime = opts["iontime"].as<double>();
+    CmdArgs args = parse_args(argc, argv);
+    const std::string& jsfile = args.jsfile;
+    const std::string& txtfile = args.txtfile;
+    const int namdtim = args.namdtim;
+    const int neleint = args.neleint;
+    const double iontime = args.iontime;
 
     printf("Converting \"%s\" to \"%s\" ...\n", jsfile.c_str(), txtfile.c_str());
     init_efield(jsfile, namdtim, neleint, iontime);

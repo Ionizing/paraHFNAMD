@@ -574,7 +574,7 @@ void RunDynamics() {
         c_onsite[i]  = new complex<double>[max(mn_loc, (size_t)1)]();
         c_midsite[i] = new complex<double>[max(mn_loc, (size_t)1)]();
     }
-    complex<double> *xtdm_c = nullptr;      // Exicton TDM spline coefficients, only work for exciton+laser.
+    complex<double> *xtdm_c = nullptr;      // Exicton TDM spline coefficients, only work for exciton+optical field.
     complex<double> *a0 = new complex<double>[max(mn_loc, (size_t)1)]();
     complex<double> *a1 = new complex<double>[max(mn_loc, (size_t)1)]();
     complex<double> *a2 = new complex<double>[max(mn_loc, (size_t)1)]();

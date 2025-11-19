@@ -6,7 +6,7 @@ efieldjs2txt.x: efieldjs2txt.o
 	$(CXX) -o $@ $< $(CXXFLAGS) $(LDFLAGS)
 
 %.o: %.cpp
-	$(CXX) -c -o $@ $< $(CXXFLAGS) $(LDFLAGS)
+	$(CXX) -c -o $@ $< $(LDFLAGS)
 
 clean:
 	rm -rf *.o *.x
