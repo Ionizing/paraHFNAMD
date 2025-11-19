@@ -116,7 +116,7 @@ static char* read_file(const char* filename) {
     FILE* f = fopen(filename, "rb");
     if (!f) {
         fprintf(stderr, "Optical field file '%s' not valid.\n", filename);
-        return NULL;
+        std::exit(EXIT_FAILURE);
     }
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
@@ -220,7 +220,7 @@ void write_efield(const std::string& fname, int namdtim, int neleint, double ion
     FILE* fp = fopen(fname.c_str(), "w");
     if (nullptr == fp) {
         std::cerr << "Cannot open " << fname << " to write efields data." << std::endl;
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     fprintf(fp, "#  Time(fs)  |   Ex           Ey          Ez  (V/A)  |\n");

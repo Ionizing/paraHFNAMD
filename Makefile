@@ -2,8 +2,10 @@ EXE = HFNAMD
 
 all: $(EXE) efieldjs2txt.x
 
-$(EXE):
+$(EXE): src/$@
 	cd src && $(MAKE) && cp $(EXE) ..
+
+efieldjs2txt.x: src/efieldjs2txt/$@
 	cd src/efieldjs2txt && $(MAKE) && cp efieldjs2txt.x ../..
 
 clean: 
