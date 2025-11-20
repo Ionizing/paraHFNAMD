@@ -252,12 +252,12 @@ struct CmdArgs {
 void print_help() {
     puts(
         "Usage:\n"
-        "  --jsfile  <file>   (default: default.js)\n"
-        "  --txtfile <file>   (default: default.txt)\n"
-        "  --namdtim <int>    (default: 100)\n"
-        "  --neleint <int>    (default: 5)\n"
-        "  --iontime <double> (default: 0.1)\n"
-        "  --help\n"
+        "  -j,--jsfile  <file>    (default: efiled.js)\n"
+        "  -t,--txtfile <file>    (default: EFIELD.txt)\n"
+        "  -n,--namdtim <integer> (default: 3000)\n"
+        "  -e,--neleint <integer> (default: 10)\n"
+        "  -i,--iontime <real>    (default: 0.1)\n"
+        "  -h,--help\n"
     );
 }
 
@@ -270,7 +270,7 @@ CmdArgs parse_args(int argc, char** argv) {
     }
 
 
-    CmdArgs args;  // 默认值已经在结构体构造时设定好
+    CmdArgs args;  // Default argument defined in CmdArgs' definition
 
     const struct option long_options[] = {
         {"jsfile",   required_argument, 0, 'j'},
