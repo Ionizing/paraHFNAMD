@@ -710,7 +710,7 @@ void AddExcitonLMI_ele(const int t_ion, const int t_ele, const int xdim,
             }
 
             BlacsIdxglb2loc(ix + start_idx, iprow, ii_loc_row, 0, xdim+start_idx, MB_ROW, nprow_group);
-            BlacsIdxglb2loc(ix + start_idx, iprow, jj_loc_col, 0, xdim+start_idx, NB_COL, npcol_group);
+            BlacsIdxglb2loc(ix + start_idx, jpcol, jj_loc_col, 0, xdim+start_idx, NB_COL, npcol_group);
 
             // irow == 0, fill in the first col
             if(myprow_group == iprow && 0 == mypcol_group) {
@@ -995,8 +995,8 @@ void CoeffUpdate(const double h, const int t_ion, const int nstates,
                 c_onsite);
 
     const int xdim = nspns * nkpts * dimC * dimV;
-    if ("exciton" == carrier && 0 != lrecomb && has_efield) {
-        ReadExcitonTDMC((namddir + "/tmpTDM/").c_str(), t_ion, xdim, xtdm_c);
+    if ("exciton" == carrier && lrecomb != 0 && has_efield) {
+        ReadExcitonTDMC((namddir + "/tmpTDM/c0123").c_str(), t_ion, xdim, xtdm_c);
     }
 
     for(int t_ele = 0; t_ele < neleint / 2; t_ele++) {
