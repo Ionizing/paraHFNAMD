@@ -103,7 +103,10 @@ void TDM_AEPart(waveclass &wvc,
 void TDM_over_dE(waveclass &wvc, complex<double> *tdm) {
     const int nvb_loc_row = Numroc(wvc.dimV, MB_ROW, myprow_group, nprow_group);
     const int ncb_loc_col = Numroc(wvc.dimC, NB_COL, mypcol_group, npcol_group);
-    const double unit_trans = 2.0 * rytoev; // * autoa / autoa, first autoa for grad, second transfer back to Angstrom
+
+    // Bugfix: previously `unit_trans = 2.0 * rytoev`, resulting wrong dimension
+    //     (autoa * autdebye * debyetoa) ~= 0.28002844
+    const double unit_trans = 2.0 * rytoev * autoa * autdebye * debyetoa; // Convert to Angstrom
     for(int ispn = 0; ispn < wvc.nspns; ispn++)
     for(int ikpt = 0; ikpt < wvc.nkpts; ikpt++) {
         for(int ii = 0; ii < 3; ii++) {

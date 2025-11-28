@@ -55,6 +55,11 @@ const double kb = 8.6173857e-5;   // eV / K
 const double rytoev = 13.605826;  // 1 Ry in Ev
 const double autoa = 0.529177249; // 1 a.u. in Angstroem
 
+// Added by Ionizing
+// 1 Debye = 1E-18 statC*m = 0.2081943 e*Angstrom
+const double autdebye = 2.541746;  // 1 atomic unit in Debye
+const double debyetoa = 0.2081943; // 1 Debye in e*Angstrom
+
 // random number
 extern unsigned seed;
 extern default_random_engine generator;
