@@ -1,0 +1,184 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\title{Technical Report: Real-Time BSE Implementation Integrated with Hefei-NAMD}
+\author{Code-level analysis of \texttt{paraHFNAMD}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Scope and code map}
+This report summarizes the implementation in this repository for real-time excitonic dynamics based on ground-state GW/BSE data and Hefei-NAMD workflows. The main code paths are:
+\begin{itemize}
+\item BSE kernel construction and exciton diagonalization: \texttt{src/bse.cpp}, \texttt{src/wpot.cpp}
+\item Transition dipole and light-matter matrix elements: \texttt{src/optical.cpp}, \texttt{src/bse.cpp}, \texttt{src/tdcft.cpp}
+\item Real-time propagation of coefficients/wavefunction amplitudes: \texttt{src/tdcft.cpp}, orchestrated by \texttt{src/dynamics.cpp}
+\end{itemize}
+
+The exciton basis index is $(s,\mathbf{k},c,v)$ with dimension
+\begin{equation}
+N_X = N_s N_k N_c N_v,
+\end{equation}
+and optionally one extra ground state for recombination/light-driven dynamics (controlled by \texttt{lrecomb}).
+
+\section{Coulomb interaction in BSE}
+\subsection{BSE matrix form implemented}
+The code builds the standard Tamm-Dancoff-like exciton Hamiltonian block(s) in \texttt{excitonclass::ExcitonMatrix}:
+\begin{equation}
+H^{\mathrm{BSE}} = D + K^d + \kappa K^x,
+\end{equation}
+where:
+\begin{itemize}
+\item $D$ is diagonal quasiparticle transition energy from \texttt{DiagonalSetting}.
+\item $K^d$ is the screened direct term from \texttt{DirectTerms} (GW) or \texttt{DirectTermsNoGW\_KbyK} (model dielectric).
+\item $K^x$ is the exchange term from \texttt{ExchangeTerms}.
+\item \texttt{kappa} is set as 2 for one-spin-channel mode and 1 for two-spin-channel mode in \texttt{excitonclass::Initial()}.
+\end{itemize}
+
+For two-spin calculations, the code fills the spin blocks explicitly (same-spin direct + exchange, cross-spin exchange blocks).
+
+\subsection{Density matrix building block $B$}
+All Coulomb terms use transition density matrix elements $B$ computed by \texttt{DensityMatrixOneKptPair} / \texttt{DensityMatrixKCV}. The implemented formula (commented in code) is
+\begin{equation}
+B^{\mathbf{k}_1 n_1}_{\mathbf{k}_2 n_2}(\mathbf{G})
+= \int d\mathbf{r}\, \psi^*_{\mathbf{k}_1 n_1}(\mathbf{r})e^{i(\mathbf{G}+\mathbf{k}_1-\mathbf{k}_2)\cdot\mathbf{r}}\psi_{\mathbf{k}_2 n_2}(\mathbf{r}),
+\end{equation}
+with PAW decomposition into:
+\begin{itemize}
+\item pseudo part from FFT of $u^*_{\mathbf{k}_1n_1}u_{\mathbf{k}_2n_2}$ (\texttt{DenMatColumnPseudoPart}),
+\item on-site AE correction using projector overlaps and $\langle\phi_i|e^{i(\mathbf{q}+\mathbf{G})\cdot\mathbf{r}}|\phi_j\rangle - \langle\tilde\phi_i|e^{i(\mathbf{q}+\mathbf{G})\cdot\mathbf{r}}|\tilde\phi_j\rangle$ terms (\texttt{DenMatCorePart...}).
+\end{itemize}
+
+Thus both direct and exchange kernels are computed using PAW-corrected transition densities, not pseudo-only densities.
+
+\subsection{Direct term $K^d$}
+\subsubsection{GW-screened case (\texttt{epsilon < 0})}
+In \texttt{DirectTerms}, the code computes for each $(\mathbf{k}_1,\mathbf{k}_2)$ pair (i.e., $\mathbf{q}=\mathbf{k}_1-\mathbf{k}_2$):
+\begin{equation}
+K^d \sim \alpha\, B^{cc}(\mathbf{G})^T\, W_{\mathbf{G}\mathbf{G}'}(\mathbf{q})\, [B^{vv}(\mathbf{G}')]^*,
+\end{equation}
+with \texttt{alpha = -1/ncells} in \texttt{ExcitonMatrix}. Two storage modes are supported:
+\begin{itemize}
+\item Full $W_{GG'}$ (\texttt{iswfull=true}): read from \texttt{WFULLxxxx.tmp} using \texttt{ReadOneWFullSub}; then BLAS matrix products perform $B^TWB^*$.
+\item Diagonal-only $W_{GG}$ (\texttt{iswfull=false}): read from \texttt{Wxxxx.tmp} into \texttt{wgg}; then elementwise scale $B^{cc}(G)$ by $W_{GG}$ and contract with $[B^{vv}]^*$.
+\end{itemize}
+
+Special $\mathbf{q}=0$ treatment is included via head/wing/cwing data read from \texttt{W0001.tmp}:
+\begin{itemize}
+\item Head average is stored in \texttt{head[9]} and inserted into $W(0,0)$.
+\item Wing/cwing are reconstructed and included in full-$W$ path; in diagonal mode, head is injected into \texttt{wgg[0]}.
+\item Factors of \texttt{ncells} are applied when reading $W$ so that the later global prefactor in direct-term contraction is consistent.
+\end{itemize}
+
+\subsubsection{Model dielectric case (\texttt{epsilon > 0})}
+If GW $W$ files are not used, \texttt{DirectTermsNoGW\_KbyK} applies
+\begin{equation}
+W_{GG'}(\mathbf{q}) \approx \frac{4\pi}{\epsilon |\mathbf{q}+\mathbf{G}|^2}\delta_{GG'}
+\end{equation}
+using precomputed \texttt{fPiOverGabs2}. A finite-cell correction is inserted for the $G=0$ element (temporary replacement in \texttt{fPiOverGabs2[0][0]}), then restored to zero.
+
+\subsection{Exchange term $K^x$}
+\texttt{ExchangeTerms} computes
+\begin{equation}
+K^x \sim \alpha\sum_{\mathbf{G}} B^{cv}(\mathbf{G})\,\frac{4\pi}{|\mathbf{G}|^2}\,[B^{cv}(\mathbf{G})]^*,
+\end{equation}
+with \texttt{alpha = +1/omega} from \texttt{ExcitonMatrix}. Implementation details:
+\begin{itemize}
+\item The code uses only index \texttt{iQQ=0} (i.e., same-$\mathbf{k}$ channel, $\mathbf{q}=0$) for exchange density matrices \texttt{DensityMatrixKCV}.
+\item Coulomb prefactor is \texttt{fPiOverGabs2[0][ig]} with $G=0$ set to zero in \texttt{GetfPiOverGabs2}, so no singular head term is used in exchange.
+\item Contraction is performed as distributed matrix multiply: $\texttt{Pzgemm("T","N")}$ between weighted left matrix and conjugated right matrix.
+\end{itemize}
+
+\section{Light-matter interaction and transition dipole}
+\subsection{Single-particle transition dipole $\langle v|\mathbf{r}|c\rangle$}
+\texttt{CalcCVtdm} builds the valence-to-conduction dipole matrix by:
+\begin{enumerate}
+\item \texttt{TDM\_PSPart}: pseudo contribution from momentum/gradient matrix
+\begin{equation}
+\langle \psi_{v\mathbf{k}}|\nabla|\psi_{c\mathbf{k}}\rangle
+= i\sum_{\mathbf{G}} C^*_{v\mathbf{G}}(\mathbf{k}+\mathbf{G})C_{c\mathbf{G}},
+\end{equation}
+computed component-wise for $x,y,z$.
+\item \texttt{TDM\_AEPart}: PAW all-electron correction via \texttt{Calc\_psmApsn}.
+\item \texttt{TDM\_over\_dE}: convert to dipole using energy denominator
+\begin{equation}
+\langle v|\mathbf{r}|c\rangle \propto \frac{\langle v|\nabla|c\rangle}{E_v-E_c},
+\end{equation}
+with unit conversion constants to output in Angstrom.
+\end{enumerate}
+
+The resulting $k$-resolved CV dipoles are also dumped to \texttt{tdmout}.
+
+\subsection{Exciton transition dipole}
+After diagonalizing BSE (\texttt{XEnergies}), \texttt{ExcitonTDM} projects CV dipoles onto exciton eigenvectors:
+\begin{equation}
+\mathbf{d}_X = \sum_{s\mathbf{k}cv} A^{X}_{s\mathbf{k}cv}\,\mathbf{d}_{s\mathbf{k}cv},
+\end{equation}
+then stores per-structure exciton dipoles in \texttt{tmpTDM/<step>} (binary). A spline stage combines them into \texttt{tmpTDM/c0123} for continuous electronic-time interpolation.
+
+\subsection{How optical field enters dynamics}
+In real-time propagation, if \texttt{carrier=="exciton"}, \texttt{lrecomb!=0}, and \texttt{has\_efield=true}:
+\begin{itemize}
+\item \texttt{ReadExcitonTDMC} reads cubic coefficients $c_0,c_1,c_2,c_3$ of exciton dipole versus ionic-time segment.
+\item \texttt{AddExcitonLMI\_ele} evaluates
+\begin{equation}
+H^{\mathrm{LMI}}_{0X}(t) = \mathbf{E}(t)\cdot\mathbf{d}_X(t),
+\end{equation}
+for each electronic substep, and writes first-column coupling from ground state to exciton manifold.
+\item Hermitian conjugate is imposed explicitly via first-row fill
+\begin{equation}
+H^{\mathrm{LMI}}_{X0}(t) = -\left[H^{\mathrm{LMI}}_{0X}(t)\right]^*.
+\end{equation}
+\end{itemize}
+This means current optical coupling is implemented in the ground$\leftrightarrow$exciton block, driven by externally provided field \texttt{efields} (from \texttt{efield.js} through QuickJS).
+
+\section{Wavefunction/coefficient propagation}
+\subsection{Dynamical equation represented in code}
+The code propagates coefficient vectors in a time-dependent linear ODE form
+\begin{equation}
+\frac{d\mathbf{C}}{dt} = A(t)\mathbf{C},
+\end{equation}
+where $A(t)$ contains diagonal energies, direct/exchange BSE terms, NAC terms, and optional light-matter coupling.
+
+Data are prepared as cubic-spline coefficients on ionic grid and evaluated on electronic substeps. Matrix sources are:
+\begin{itemize}
+\item \texttt{ReadOnsiteC}: onsite part (energies + BSE direct/exchange, plus optical coupling add-on).
+\item \texttt{ReadMidsiteC}: midsite part (NAC/e-ph and recombination channels).
+\end{itemize}
+
+\subsection{Two-half-step update pattern}
+\texttt{CoeffUpdate} advances from ionic step $t_{\mathrm{ion}}$ to $t_{\mathrm{ion}}+1$ using \texttt{neleint} electronic substeps with $h=\texttt{iontime}/\texttt{neleint}$:
+\begin{enumerate}
+\item Read onsite coefficients for current ionic interval.
+\item Propagate first half electronic steps using currently available midsite coefficients.
+\item Refresh midsite coefficients via \texttt{ReadMidsiteC(t\_ion)}.
+\item Propagate second half electronic steps.
+\end{enumerate}
+A bounce-back indexing/mirroring scheme allows periodic forward-backward traversal of trajectory data when simulation time exceeds sampled structures.
+
+\subsection{From spline coefficients to local generator}
+\texttt{Mat\_CtoA} evaluates cubic polynomials of onsite and midsite coefficient sets at each electronic substep time and builds four local tensors $a_0,a_1,a_2,a_3$ representing Taylor data of $A(t)$ for the short interval.
+
+\subsection{Integrator choices}
+Two integrators are implemented:
+\begin{itemize}
+\item \texttt{Euler} (\texttt{A0Coeff}): first-order update $\mathbf{C}\leftarrow \mathbf{C}+hA\mathbf{C}$ with renormalization.
+\item \texttt{Magnus} (default high-accuracy path):
+\begin{enumerate}
+\item \texttt{Mat\_AtoOmega} computes truncated Magnus operator $\Omega$ using commutators (BIT Numer.
+Math.
+40, 434--450 (2000), as cited in code comments).
+\item \texttt{EomegaCoeff} applies $\exp(ih\,\Omega/(ih))=\exp(ih\,\texttt{om\_oih})$ by diagonalizing Hermitian \texttt{om\_oih} with \texttt{Pzheev}, exponentiating eigenvalues, and transforming back.
+\end{enumerate}
+\end{itemize}
+
+Thus propagation is not simple RK; it is a distributed, commutator-based Magnus exponential integrator on top of spline-interpolated Hamiltonian/NAC/BSE/LMI matrices.
+
+\section{End-to-end summary}
+At each sampled structure, the code can build BSE ingredients from PAW-corrected transition densities and GW-screened Coulomb data (or model dielectric), producing diagonal, direct, exchange, and exciton dipole outputs. During dynamics, these quantities are spline-interpolated in time, combined with NAC channels and optional external optical field, and propagated through a Magnus exponential stepper for coefficient evolution in the chosen basis.
+
+\end{document}
