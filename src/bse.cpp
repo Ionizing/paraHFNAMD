@@ -1038,8 +1038,46 @@ void excitonclass::XEnergies(const complex<double> *bcmat) {
         Xtdm_full = new complex<double>[3 * nsdim]();
     }
     MPI_Barrier(group_comm);
-    ExcitonTDM(eigenvecs, Xtdm_full);
     Blacs_MatrixZGather(nsdim, nsdim, eigenvecs, nsdim_loc_row, root_eigenvecs, nsdim);
+
+    // Phase-align current exciton eigenvectors against previous ionic step.
+    // This stabilizes gauge continuity of per-step exciton TDM output.
+    complex<double> *col_phase = new complex<double>[nsdim]();
+    fill_n(col_phase, nsdim, complex<double>(1.0, 0.0));
+    if(is_sub_root && dirnum > 1) {
+        const string prev_bsevec = runhome + '/' + Int2Str(dirnum - 1) + "/bsevec";
+        ifstream prevf(prev_bsevec.c_str(), ios::in | ios::binary);
+        if(prevf.is_open()) {
+            prevf.seekg(0, ios::end);
+            const size_t fsz = (size_t)prevf.tellg();
+            prevf.seekg(0, ios::beg);
+            if(fsz == sizeof(complex<double>) * (size_t)nsdim * nsdim) {
+                complex<double> *prev_eigenvecs = new complex<double>[nsdim * nsdim]();
+                prevf.read((char*)prev_eigenvecs, sizeof(complex<double>) * nsdim * nsdim);
+                for(int ix = 0; ix < nsdim; ix++) {
+                    complex<double> overlap = 0.0;
+                    for(int ii = 0; ii < nsdim; ii++) {
+                        overlap += conj(prev_eigenvecs[ii + (size_t)ix * nsdim])
+                                 *      root_eigenvecs[ii + (size_t)ix * nsdim];
+                    }
+                    if(abs(overlap) > 1e-14) col_phase[ix] = exp(-iu_d * arg(overlap));
+                    Zscal(nsdim, col_phase[ix], root_eigenvecs + (size_t)ix * nsdim, 1);
+                }
+                delete[] prev_eigenvecs;
+            }
+            prevf.close();
+        }
+    }
+    MPI_Bcast(col_phase, nsdim, MPI_CXX_DOUBLE_COMPLEX, sub_root, group_comm);
+    #pragma omp parallel for
+    for(int jcol = 0; jcol < nsdim_loc_col; jcol++) {
+        const int jcol_glb = BlacsIdxloc2glb(jcol, nsdim, NB_COL, mypcol_group, npcol_group);
+        Zscal(nsdim_loc_row, col_phase[jcol_glb], eigenvecs + (size_t)jcol * nsdim_loc_row, 1);
+    }
+    MPI_Barrier(group_comm);
+    delete[] col_phase;
+
+    ExcitonTDM(eigenvecs, Xtdm_full);
     if(is_sub_root) {
         const int ww = (int)log10(nsdim) + 1;
         ofstream bseout((runhome + '/' + Int2Str(dirnum) + "/bseout").c_str(), ios::out);
