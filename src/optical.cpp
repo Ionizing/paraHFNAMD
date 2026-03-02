@@ -147,6 +147,29 @@ void CalcCVtdm(waveclass &wvc, const int dirnum,
         // because of column-major, slow to fast axis is ic->jv
     }
     if(is_sub_root) {
+        // Smooth only the output tdmout gauge step-to-step.
+        // This does not alter cvtdm_full used by subsequent physics routines.
+        const size_t ntrans = (size_t)wvc.nspns * wvc.nkpts * wvc.dimV * wvc.dimC;
+        const size_t ntot = 3 * ntrans;
+        complex<double> *smooth_tdm = new complex<double>[ntot];
+        for(size_t ii = 0; ii < ntot; ii++) smooth_tdm[ii] = cvtdm_full[ii];
+        static complex<double> *prev_tdm = NULL;
+        static size_t prev_ntot = 0;
+        if(prev_tdm && prev_ntot == ntot && dirnum > 1) {
+            for(size_t itr = 0; itr < ntrans; itr++) {
+                complex<double> ov = 0.0;
+                for(int ii = 0; ii < 3; ii++) ov += conj(prev_tdm[ii * ntrans + itr]) * smooth_tdm[ii * ntrans + itr];
+                if(abs(ov) > 1e-14) {
+                    const complex<double> iph = exp(-iu_d * arg(ov));
+                    for(int ii = 0; ii < 3; ii++) smooth_tdm[ii * ntrans + itr] *= iph;
+                }
+            }
+        }
+        if(prev_tdm) delete[] prev_tdm;
+        prev_tdm = new complex<double>[ntot];
+        prev_ntot = ntot;
+        for(size_t ii = 0; ii < ntot; ii++) prev_tdm[ii] = smooth_tdm[ii];
+
         ofstream tdmout((runhome + '/' + Int2Str(dirnum) + "/tdmout").c_str(), ios::out);
         if(!tdmout.is_open())  { cerr << "ERROR: " << runhome + '/' + Int2Str(dirnum) + "/tdmout" << " can't open" << endl; exit(1); }
         tdmout << "#" << endl
@@ -169,7 +192,7 @@ void CalcCVtdm(waveclass &wvc, const int dirnum,
             for(int ii = 0; ii < 3; ii++) {
                 for(int ivb = 0; ivb < wvc.dimV; ivb++) {
                     for(int icb = 0; icb < wvc.dimC; icb++)
-                    tdmout << cvtdm_full[(ii * wvc.nspns * wvc.nkpts + ispn * wvc.nkpts + ikpt) * wvc.dimV * wvc.dimC +
+                    tdmout << smooth_tdm[(ii * wvc.nspns * wvc.nkpts + ispn * wvc.nkpts + ikpt) * wvc.dimV * wvc.dimC +
                                          ivb + icb * wvc.dimV];
                     tdmout << endl;
                 }
@@ -177,6 +200,7 @@ void CalcCVtdm(waveclass &wvc, const int dirnum,
             }
         }
         tdmout.close();
+        delete[] smooth_tdm;
     }
     
     MPI_Barrier(group_comm);
