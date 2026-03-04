@@ -1,5 +1,7 @@
 #include "bse.h"
 
+#define IGNORE_EXCITON_WV
+
 void excitonclass::GetngBSE() {
     #pragma omp parallel for
     for(int i = 0; i < 3; i++) {
@@ -52,7 +54,7 @@ void excitonclass::GetgidxBSE() {
     }
     MPI_Barrier(node_comm);
     
-    for(int rt = 0; rt < node_comm; rt++) { // loop for root(rt) to broadcast
+    for(int rt = 0; rt < node_size; rt++) { // loop for root(rt) to broadcast
         for(int iQQ = rt; iQQ < numQ; iQQ += node_size) {
             MPI_Bcast(npw + iQQ, 1, MPI_INT, rt, node_comm);            // broadcast npw
             MPI_Bcast(qptvecs[iQQ], 3, MPI_DOUBLE, rt, node_comm);     // extra broadcast qptvecs
@@ -61,6 +63,7 @@ void excitonclass::GetgidxBSE() {
     MPI_Barrier(node_comm);
     
     const size_t totnpw = accumulate(npw, npw + numQ, 0);
+DEBUG_STOP(npw[0], npw[numQ - 1], totnpw);
     MpiWindowShareMemoryInitial(totnpw, gidxall, local_gidx_node, window_gidx);
     size_t sumnpw = 0;
     for(int iQQ = 0; iQQ < numQ; iQQ++) {
@@ -88,6 +91,7 @@ void excitonclass::Getqgabsdir() {
     qgtheta             = new double*[numQ];
     qgphi               = new double*[numQ];
     const size_t totnpw = accumulate(npw, npw + numQ, 0);
+//DEBUG_STOP();
     MpiWindowShareMemoryInitial(totnpw, qgabsall,   local_qgabs_node,   window_qgabs);
     MpiWindowShareMemoryInitial(totnpw, qgthetaall, local_qgtheta_node, window_qgtheta);
     MpiWindowShareMemoryInitial(totnpw, qgphiall,   local_qgphi_node,   window_qgphi);
@@ -120,6 +124,7 @@ void excitonclass::GetfftIntPre(const int sign) {
     isGetfftIntPre = true;
     fftIntPre            = new complex<double>*[numQ];
     const size_t totnpw = accumulate(npw, npw + numQ, 0);
+//DEBUG_STOP();
     MpiWindowShareMemoryInitial(totnpw, fftIntPreall, local_fftIntPre_node, window_fftIntPre);
     size_t sumnpw = 0;
     for(int iQQ = 0; iQQ < numQ; iQQ++) {
@@ -148,6 +153,7 @@ void excitonclass::GetfPiOverGabs2(const int nQQ) {
     isGetfPiOverGabs2 = true;
     fPiOverGabs2         = new double*[nQQ];
     const size_t totnpw = accumulate(npw, npw + numQ, 0);
+//DEBUG_STOP();
     MpiWindowShareMemoryInitial(totnpw, fPiOverGabs2all, local_fPiOverGabs2, window_fPiOverGabs2, malloc_root);
     size_t sumnpw = 0;
     for(int iQQ = 0; iQQ < nQQ; iQQ++) {
@@ -158,7 +164,9 @@ void excitonclass::GetfPiOverGabs2(const int nQQ) {
 
     int gx, gy, gz;
     double gabs, theta, phi;
-    for(int iQQ = node_rank - malloc_root; iQQ < nQQ; iQQ += share_memory_len) {
+    int iQQbeg = node_rank - malloc_root;
+    while(iQQbeg < 0) iQQbeg += share_memory_len;
+    for(int iQQ = iQQbeg; iQQ < nQQ; iQQ += share_memory_len) {
         #pragma omp parallel for private(gx, gy, gz, gabs, theta, phi)
         for(int ig = 0; ig < npw[iQQ]; ig++) {
             IdxNat1toSym3(gidx[iQQ][ig], gx, gy, gz, ng[0], ng[1], ng[2]);
@@ -589,6 +597,7 @@ void excitonclass::DensityMatrixKCV(const int spn, complex<double> *denmat) {
     int ikpt, icb, ivb;
     complex<double> *kcvdenmat;
     MPI_Win window_kcvdenmat; complex<double> *local_kcvdenmat;
+//DEBUG_STOP();
     MpiWindowShareMemoryInitial((size_t)npw[0] * dim,
                                 kcvdenmat, local_kcvdenmat, window_kcvdenmat, malloc_root);
     int kcv_glb;
@@ -808,7 +817,9 @@ void excitonclass::DirectTermsNoGW_KbyK(const double epsl, const int spnL, const
                        * autoa * 2.0 * rytoev * omega;              // Hartree to eV, times "omega" to cancel alpha
     MPI_Barrier(group_comm);
 
+    double tstart, tend;
     for(int ik12 = sub_rank; ik12 < NKSCtot * NKSCtot; ik12 += sub_size) {
+        tstart = omp_get_wtime();
         const int ik1 = ik12 / NKSCtot;
         const int ik2 = ik12 % NKSCtot;
         const int iQQ = MatchKptDiff(ik1, ik2, NK_SC);
@@ -830,6 +841,14 @@ void excitonclass::DirectTermsNoGW_KbyK(const double epsl, const int spnL, const
               dimCC, dimVV, npw[iQQ],
               alpha / epsl, ccDenMat, npw[iQQ], vvDenMat, npw[iQQ],
               beta, scTerms + ik12 * (dimCC * dimVV), dimCC);
+
+        tend = omp_get_wtime();
+        if (ik2 == NKSCtot - 1 && totstru < 10) {
+            cout << "Direct Term  " << ik12 << '/' << NKSCtot * NKSCtot << "  "
+                 << "k1, k2 = " << ik1 << '/' << NKSCtot << ' ' << ik2 << '/' << NKSCtot << ": "
+                 << setiosflags(ios::fixed) << setprecision(1) << tend - tstart << " s" << endl;
+            cout.copyfmt(iosDefaultState);
+        }
         
         delete[] ccDenMat; delete[] vvDenMat;
     } // ik1, ik2
@@ -1164,12 +1183,14 @@ void excitonclass::ExcitonMatrix(const int num) {
     complex<double> *exTerms = new complex<double>[max(dim_loc_row * dim_loc_col, 1)]();
     complex<double> *scTerms = NULL;
     MPI_Win window_scTerms; complex<double> *local_scTerms = NULL;
+//DEBUG_STOP();
     MpiWindowShareMemoryInitial(NKSCtot2 * dimCC * dimVV,
                                 scTerms, local_scTerms, window_scTerms, malloc_root);
     ofstream rtmatout;
     
     DiagonalSetting(numspns, gapdiff, bcmat);  // D
-    //double tstart, tend; tstart = omp_get_wtime();
+    double tstart, tend; tstart = omp_get_wtime();
+#ifndef IGNORE_EXCITON_WV
     for(int spn1 = 0; spn1 < numspns; spn1++) for(int spn2 = 0; spn2 < numspns; spn2++) { // D + K^d
         if(totdiffspns == 1) {
             if(spn1 == 0 && spn2 == 0) {
@@ -1194,6 +1215,25 @@ void excitonclass::ExcitonMatrix(const int num) {
         ExTerms2BSEMat(numspns, spn1, spn2, exTerms, rootmat, bcmat);
     }
     //tend = omp_get_wtime(); Cout << "2 ExchangeTerms: " << tend - tstart << " s" << endl; MPI_Barrier(group_comm);
+#else
+#warning "Excitonic W and V are set to zero."
+    const size_t sc_terms_size = (size_t)NKSCtot2 * dimCC * dimVV;
+    if(node_rank == malloc_root) {
+        fill_n(local_scTerms, sc_terms_size, complex<double>(0.0, 0.0));
+    }
+    MPI_Barrier(node_comm);
+    MPI_Barrier(group_comm);
+    for(int spn1 = 0; spn1 < numspns; spn1++) for(int spn2 = 0; spn2 < numspns; spn2++) {
+        ScTerms2BSEMat(numspns, spn1, spn2, scTerms, rootmat, bcmat);
+    }
+    tend = omp_get_wtime(); Cout << "1 DirectTerms: " << tend - tstart << " s" << endl;
+
+    fill_n(exTerms, (size_t)max(dim_loc_row * dim_loc_col, 1), complex<double>(0.0, 0.0));
+    for(int spn1 = 0; spn1 < numspns; spn1++) for(int spn2 = 0; spn2 < numspns; spn2++) {
+        ExTerms2BSEMat(numspns, spn1, spn2, exTerms, rootmat, bcmat);
+    }
+    tend = omp_get_wtime(); Cout << "2 ExchangeTerms: " << tend - tstart << " s" << endl; MPI_Barrier(group_comm);
+#endif
     
     XEnergies(bcmat);
     

@@ -1,7 +1,7 @@
 EXE = HFNAMD
 CXX = mpiicpc
 
-CFLAGS = -g -O2 -std=c++20
+CFLAGS = -g -O2 -std=c++20 -fno-omit-frame-pointer -traceback -rdynamic -DDEBUG_ENABLE=0
 OMP_FLAG = -qopenmp
 INC = -I $(MKLROOT)/include \
       -I $(MKLROOT)/include/fftw

@@ -31,6 +31,13 @@
 
 #include "const.h"
 
+#ifdef DEBUG_SKIP_WV
+    #define DEBUG_SKIP_W
+    #define DEBUG_SKIP_V
+#endif
+
+#include "debug.h"
+
 using namespace std;
 
 bool FFTch1(int n);

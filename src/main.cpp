@@ -15,6 +15,9 @@
 #include "tdcft.h"
 #include "efield.h"
 
+#define DEBUG_AUTO_INSTALL_SIGINT
+#include "debug.h"
+
 using namespace std;
 
 // random number
