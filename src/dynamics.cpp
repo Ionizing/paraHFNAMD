@@ -297,7 +297,9 @@ void DynamicsMatrixConstruct() {
     waveclass *wvcPtrC = &wvc1, *wvcPtrN = &wvc2;   // pointer for current and next
     WVCBasicProcess(wvcPtrN, &soccls, loc_strubeg); // initial basic process for the first structure
     double tstart, tend, dur1, dur2, dur3;
+//DEBUG(loc_strubeg, loc_totstru);
     for(int tt = loc_strubeg; tt < loc_strubeg + loc_totstru; tt++) { // loop for continuous time, real time = tt
+//DEBUG(tt);
         tstart = omp_get_wtime();
         PointerSwap(wvcPtrC, wvcPtrN); // swap and wvcPtrC stores basic parts of informations 
         dur2 = WVCAdvanProcess(wvcPtrC, &extc, tt);      // for current WVC

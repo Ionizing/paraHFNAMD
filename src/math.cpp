@@ -79,10 +79,12 @@ void SplineInterpolation(DFTaskPtr &task, MKL_INT nsite, double *sites, double *
 //**************************************************************************************
 double Dasum(const long n, const double *x, const long incx) {
     if(n > 0) return cblas_dasum(n, x, incx);
+    return 0.0;
 }
 
 double DZnrm2(const long n, const complex<double> *x, const long incx) {
     if(n > 0) return cblas_dznrm2(n, x, incx);
+    return 0.0;
 }
 
 void Dcopy(const long n, const double *x, const long incx, 

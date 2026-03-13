@@ -63,7 +63,7 @@ void excitonclass::GetgidxBSE() {
     MPI_Barrier(node_comm);
     
     const size_t totnpw = accumulate(npw, npw + numQ, 0);
-DEBUG_STOP(npw[0], npw[numQ - 1], totnpw);
+//DEBUG_STOP(npw[0], npw[numQ - 1], totnpw);
     MpiWindowShareMemoryInitial(totnpw, gidxall, local_gidx_node, window_gidx);
     size_t sumnpw = 0;
     for(int iQQ = 0; iQQ < numQ; iQQ++) {

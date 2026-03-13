@@ -42,11 +42,25 @@ void atomclass::Getcrexp(const int nkpts, double **kptvecs, const int *npw, int 
     return;
 }
 
+void atomclass::FreecrexpWin() {
+    if(isGetcrexp) {
+        MPI_Win_free(&window_crexp);
+        delete[] crexp;
+        crexp = NULL;
+        crexp_forall = NULL;
+        local_crexp = NULL;
+        nkpts = 0;
+        isGetcrexp = false;
+    }
+    return;
+}
+
 void atomclass::Getcrexp_q(const int nqpts, double **qptvecs, const int *npw,
                            int **gidx, const int ng_bse[3], const int addqptv) {
     if(!isGetcrexp_q) {
         size_t totnpw = 0;
         for(int iqpt = 0; iqpt < nqpts; iqpt++) totnpw += npw[iqpt];
+//DEBUG(nqpts, addqptv, totnpw, malloc_root);
         MpiWindowShareMemoryInitial(totnpw, crexp_q_forall, local_crexp_q, window_crexp_q, malloc_root);
         crexp_q = new complex<double>*[nqpts];
         size_t sumnpw = 0;
@@ -142,8 +156,7 @@ void atomclass::Initial(string posstr, double *a[], pawpotclass *input_potc,
 }
 atomclass::~atomclass() {
     if(isGetcrexp) {
-        MPI_Win_free(&(window_crexp));
-        delete[] crexp;
+        this->FreecrexpWin();
     }
     if(isGetcrexp_q) {
         MPI_Win_free(&(window_crexp_q));
@@ -420,13 +433,12 @@ void waveclass::AtomsRefresh(const char *posfile) { // refresh positions and exp
         string        posfilestr = WholeFile2String(inf);
         istringstream posfiless(posfilestr);
         string line;
-        vector<string> vecstrtmp;
+        //vector<string> vecstrtmp;
         for(int i = 0; i < 8; i++) getline(posfiless, line); // skip lines to atom positions
         if(line.find("Selective dynamics") != string::npos) getline(posfiless, line); // skip extra one line
         for(int iatom = 0; iatom < numatoms; iatom++) {
             getline(posfiless, line);
             atoms[iatom].LoadPosition(line, a);
-            atoms[iatom].Getcrexp(nkpts, kptvecs, npw, ng, gidx, sub_rank, sub_size, group_comm);
         }
     }
     inf.close();
@@ -816,7 +828,11 @@ void waveclass::CalcRealc() {
 void waveclass::CalcProjPhi(const char *normcar, const bool is_write_normcar) {
     complex<double> **coeffs = new complex<double>*[nstates];
     for(int ie = 0; ie < nstates; ie++) coeffs[ie] = eigens[ie].coeff;
-    for(int iatom = 0; iatom < numatoms; iatom++) atoms[iatom].Getprojphi(nspns, nkpts, nbnds, kpoints, coeffs, npw, volume, spinor);
+    for(int iatom = 0; iatom < numatoms; iatom++) {
+        atoms[iatom].Getcrexp(nkpts, kptvecs, npw, ng, gidx, sub_rank, sub_size, group_comm);
+        atoms[iatom].Getprojphi(nspns, nkpts, nbnds, kpoints, coeffs, npw, volume, spinor);
+        atoms[iatom].FreecrexpWin();
+    }
     delete[] coeffs;
     if(is_sub_root && is_write_normcar) {
         ofstream otf(normcar, ios::out|ios::binary);

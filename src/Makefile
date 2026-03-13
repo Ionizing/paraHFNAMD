@@ -1,7 +1,7 @@
 EXE = HFNAMD
 CXX = mpiicpc
 
-CFLAGS = -g -O2 -std=c++20 -fno-omit-frame-pointer -traceback -rdynamic -DDEBUG_ENABLE=0
+CFLAGS = -g -O2 -std=c++20 -fno-omit-frame-pointer -traceback -rdynamic -DDEBUG_ENABLE=1 -Wall -Wextra
 OMP_FLAG = -qopenmp
 INC = -I $(MKLROOT)/include \
       -I $(MKLROOT)/include/fftw
@@ -51,7 +51,10 @@ libqjs.a:
 fftw3x_cdft:
 	cp -r $(MKLROOT)/interfaces/$@ .
 
-%.o: %.cpp w3j.h
+main.o: main.cpp w3j.h
+	$(CXX) $(CFLAGS) $(OMP_FLAG) $(INC) -c $< -o $@
+
+%.o: %.cpp w3j.h %.h
 	$(CXX) $(CFLAGS) $(OMP_FLAG) $(INC) -c $< -o $@
 
 w3j.h:

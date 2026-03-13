@@ -55,14 +55,14 @@ class atomclass {
     // here is nkpts, NOT totnkpts, see details in paw.h
     // updata: int VASP code, it use exp(iG.R) not exp(i(G+k).R)
     //         but here I use the latter one
-    complex<double> *crexp_forall;
-    MPI_Win window_crexp; complex<double> *local_crexp;
+    complex<double> *crexp_forall = nullptr;
+    MPI_Win window_crexp; complex<double> *local_crexp = nullptr;
     
     // exp(i(q+G).R), for bse calculation, with size nqpts
     int nqpts;
-    complex<double> **crexp_q;
-    complex<double> *crexp_q_forall;
-    MPI_Win window_crexp_q; complex<double> *local_crexp_q;
+    complex<double> **crexp_q = nullptr;
+    complex<double> *crexp_q_forall = nullptr;
+    MPI_Win window_crexp_q; complex<double> *local_crexp_q = nullptr;
     
     complex<double> *projphi_bc = NULL; // "bc" for "block-cyclic"
     complex<double> *projphi = NULL;
@@ -80,6 +80,7 @@ class atomclass {
     void LoadPosition(string posstr, double *a[]);
     void Getcrexp(const int nkpts, double **kptvecs, const int *npw, int ng[], int **gidx,
                   int rk, int sz, MPI_Comm &comm, const int addkptv = 1); bool isGetcrexp = false;
+    void FreecrexpWin();
     void Getcrexp_q(const int nqpts, double **qptvecs, const int *npw,
                     int **gidx, const int ng_bse[3], const int addqptv = 1); bool isGetcrexp_q = false;
     void Getprojphi(const int nspns, const int nkpts, const int nbnds, vector<int> &kpoints, 
